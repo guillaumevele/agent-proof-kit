@@ -1,0 +1,35 @@
+{
+  "name": "agent-proof-kit",
+  "version": "0.1.0",
+  "description": "Deterministic release gates for AI agent runs, backed by synthetic fixtures.",
+  "type": "module",
+  "private": false,
+  "bin": {
+    "agent-proof": "./bin/agent-proof.js"
+  },
+  "scripts": {
+    "test:unit": "node --test tests/unit/*.test.js",
+    "test:cli": "node --test tests/cli/*.test.js",
+    "scan:leaks": "node bin/agent-proof.js scan --path . --policy policies/default-policy.json --format text",
+    "report:generate": "node scripts/generate-report.js",
+    "report:verify": "node scripts/check-generated-report.js",
+    "verify": "npm run test:unit && npm run test:cli && npm run scan:leaks && npm run report:generate && npm run report:verify"
+  },
+  "engines": {
+    "node": ">=20.11"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/guillaumevele/agent-proof-kit.git"
+  },
+  "keywords": [
+    "ai-agents",
+    "agent-evaluation",
+    "evals",
+    "release-gates",
+    "workflow-safety",
+    "synthetic-data"
+  ],
+  "author": "Guillaume Vele",
+  "license": "MIT"
+}

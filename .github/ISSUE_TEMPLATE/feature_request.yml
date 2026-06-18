@@ -1,0 +1,30 @@
+name: Feature request
+description: Propose a focused extension to the proof kit.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Which release gate or review workflow would this improve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: Keep the scope narrow and testable.
+    validations:
+      required: true
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Constraints
+      options:
+        - label: Works without model API keys.
+          required: true
+        - label: Uses synthetic data only.
+          required: true
+        - label: Can be covered by automated tests.
+          required: true

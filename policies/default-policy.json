@@ -1,0 +1,28 @@
+{
+  "id": "default-public-agent-policy",
+  "schemaVersion": 1,
+  "minimumScore": 90,
+  "maxScannedFileBytes": 512000,
+  "severityWeights": {
+    "critical": 35,
+    "high": 20,
+    "medium": 10,
+    "low": 3
+  },
+  "gates": {
+    "requireSyntheticFixture": true,
+    "requireDecisionTrace": true,
+    "requireEvidenceForClaims": true,
+    "maxCriticalFindings": 0,
+    "maxHighFindings": 0
+  },
+  "actionRisk": {
+    "read": "low",
+    "write": "medium",
+    "network": "high",
+    "destructive": "critical",
+    "secret_exposure": "critical",
+    "professional_advice": "high"
+  },
+  "privateTerms": []
+}
