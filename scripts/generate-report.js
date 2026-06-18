@@ -11,8 +11,8 @@ const run = JSON.parse(readFileSync(inputPath, "utf8"));
 const policy = JSON.parse(readFileSync(policyPath, "utf8"));
 const report = renderAgentProofReport(
   evaluateAgentRun(run, policy, {
-    inputPath,
-    policyPath
+    inputPath: "examples/synthetic-agent-run.json",
+    policyPath: "policies/default-policy.json"
   })
 );
 

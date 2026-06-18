@@ -1,19 +1,37 @@
 {
   "name": "agent-proof-kit",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Deterministic release gates for AI agent runs, backed by synthetic fixtures.",
   "type": "module",
   "private": false,
   "bin": {
     "agent-proof": "./bin/agent-proof.js"
   },
+  "files": [
+    "bin/",
+    "src/",
+    "schemas/",
+    "policies/",
+    "examples/",
+    "docs/generated/",
+    "action.yml"
+  ],
   "scripts": {
     "test:unit": "node --test tests/unit/*.test.js",
+    "test:schema": "node --test tests/schema/*.test.js",
+    "test:adapter": "node --test tests/adapter/*.test.js",
+    "test:diff": "node --test tests/diff/*.test.js",
+    "test:sarif": "node --test tests/sarif/*.test.js",
     "test:cli": "node --test tests/cli/*.test.js",
+    "test:pack": "node --test tests/pack/*.test.js",
     "scan:leaks": "node bin/agent-proof.js scan --path . --policy policies/default-policy.json --format text",
+    "scan:generated": "node bin/agent-proof.js scan --path docs/generated --policy policies/default-policy.json --format text",
     "report:generate": "node scripts/generate-report.js",
     "report:verify": "node scripts/check-generated-report.js",
-    "verify": "npm run test:unit && npm run test:cli && npm run scan:leaks && npm run report:generate && npm run report:verify"
+    "artifacts:generate": "node scripts/generate-machine-artifacts.js",
+    "artifacts:verify": "node scripts/check-machine-artifacts.js",
+    "refresh": "npm run report:generate && npm run artifacts:generate",
+    "verify": "npm run test:unit && npm run test:schema && npm run test:adapter && npm run test:diff && npm run test:sarif && npm run test:cli && npm run test:pack && npm run report:verify && npm run artifacts:verify && npm run scan:leaks && npm run scan:generated"
   },
   "engines": {
     "node": ">=20.11"

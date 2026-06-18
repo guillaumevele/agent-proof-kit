@@ -8,6 +8,7 @@ const skippedExtensions = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".p
 export function scanPublicSurface(rootPath, policy = {}, options = {}) {
   const files = listFiles(rootPath);
   const findings = [];
+  const skippedFiles = [];
   let filesScanned = 0;
 
   for (const file of files) {
@@ -16,7 +17,18 @@ export function scanPublicSurface(rootPath, policy = {}, options = {}) {
     findings.push(...fileFindings);
 
     const stats = statSync(file);
-    if (stats.size > (policy.maxScannedFileBytes ?? 512_000)) continue;
+    if (stats.size > (policy.maxScannedFileBytes ?? 512_000)) {
+      skippedFiles.push({ path: rel, bytes: stats.size });
+      findings.push({
+        id: "surface.file_not_scanned",
+        severity: "high",
+        title: "File exceeded scan size limit",
+        location: rel,
+        evidence: `${stats.size} bytes`,
+        recommendation: "Scan the file separately, lower the file size, or raise maxScannedFileBytes deliberately in policy."
+      });
+      continue;
+    }
 
     const content = readFileSync(file, "utf8");
     filesScanned += 1;
@@ -25,8 +37,9 @@ export function scanPublicSurface(rootPath, policy = {}, options = {}) {
 
   return {
     status: findings.length === 0 ? "pass" : "fail",
-    rootPath,
+    rootPath: options.displayRoot ?? rootPath,
     filesScanned,
+    skippedFiles,
     findings
   };
 }

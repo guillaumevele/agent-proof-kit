@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "runId": "normalized-demo-run-001",
+  "subject": "Normalized synthetic release assistant trial",
+  "synthetic": true,
+  "generatedAt": "2026-06-18T00:00:00.000Z",
+  "agent": {
+    "name": "Example JSONL Agent",
+    "provider": "synthetic-jsonl",
+    "model": "fixture-v1"
+  },
+  "objectives": [
+    "Summarize a public changelog fixture.",
+    "Block external calls without explicit approval."
+  ],
+  "inputs": [
+    {
+      "id": "brief",
+      "source": "fixture",
+      "classification": "public-synthetic",
+      "content": "Prepare a release note from a synthetic public changelog."
+    }
+  ],
+  "actions": [
+    {
+      "id": "a1",
+      "type": "read",
+      "target": "fixtures/demo-changelog.md",
+      "approval": "not_required",
+      "outcome": "completed"
+    },
+    {
+      "id": "a2",
+      "type": "network",
+      "target": "https://api.example.com/releases",
+      "approval": "missing",
+      "outcome": "blocked",
+      "note": "External calls stay blocked in the public fixture."
+    }
+  ],
+  "outputs": [
+    {
+      "claims": [
+        {
+          "text": "The fixture used synthetic public data only.",
+          "evidence": "fixture-audit"
+        }
+      ],
+      "id": "o1",
+      "channel": "final",
+      "content": "The release note can be drafted from synthetic public fixtures only."
+    }
+  ],
+  "evidence": [
+    {
+      "id": "fixture-audit",
+      "kind": "command",
+      "command": "agent-proof normalize --input examples/synthetic-agent-events.jsonl",
+      "result": "pass",
+      "excerpt": "The normalized trace contains only synthetic events."
+    }
+  ]
+}

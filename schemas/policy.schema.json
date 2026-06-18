@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/guillaumevele/agent-proof-kit/schemas/policy.schema.json",
+  "title": "Agent Proof Kit Policy",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["id", "schemaVersion", "minimumScore", "gates", "actionRisk"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "schemaVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "minimumScore": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "maxScannedFileBytes": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "severityWeights": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "number",
+        "minimum": 0
+      }
+    },
+    "gates": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "actionRisk": {
+      "type": "object",
+      "additionalProperties": {
+        "enum": ["low", "medium", "high", "critical"]
+      }
+    },
+    "privateTerms": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

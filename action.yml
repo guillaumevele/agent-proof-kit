@@ -1,0 +1,28 @@
+name: Agent Proof Kit
+description: Deterministic release gates for synthetic AI-agent runs.
+author: Guillaume Vele
+inputs:
+  input:
+    description: Path to an Agent Proof Kit agent-run JSON file.
+    required: true
+  policy:
+    description: Path to a policy JSON file.
+    required: true
+  report:
+    description: Markdown report path to write.
+    required: false
+    default: agent-proof-report.md
+  sarif:
+    description: SARIF report path to write.
+    required: false
+    default: agent-proof-results.sarif
+runs:
+  using: composite
+  steps:
+    - name: Generate proof report
+      shell: bash
+      run: node "${{ github.action_path }}/bin/agent-proof.js" verify --input "${{ inputs.input }}" --policy "${{ inputs.policy }}" --format markdown --out "${{ inputs.report }}"
+    - name: Generate SARIF report
+      shell: bash
+      if: always()
+      run: node "${{ github.action_path }}/bin/agent-proof.js" verify --input "${{ inputs.input }}" --policy "${{ inputs.policy }}" --format sarif --out "${{ inputs.sarif }}"

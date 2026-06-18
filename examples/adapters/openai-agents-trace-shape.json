@@ -1,0 +1,22 @@
+{
+  "note": "Synthetic shape reference only. Do not paste real traces into public fixtures.",
+  "trace": {
+    "trace_id": "trace_synthetic_001",
+    "workflow_name": "synthetic-release-workflow",
+    "group_id": "public-demo",
+    "metadata": {
+      "classification": "public-synthetic"
+    }
+  },
+  "spans": [
+    {
+      "span_id": "span_read_fixture",
+      "trace_id": "trace_synthetic_001",
+      "parent_id": null,
+      "span_data": {
+        "type": "tool_call",
+        "name": "read_fixture"
+      }
+    }
+  ]
+}

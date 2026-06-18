@@ -31,3 +31,13 @@ test("detects secret-shaped text and private terms", () => {
   assert.ok(result.findings.some((finding) => finding.id === "secret.openai_key"));
   assert.ok(result.findings.some((finding) => finding.id === "privacy.private_term"));
 });
+
+test("fails when a file is too large to scan", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agent-proof-large-"));
+  writeFileSync(join(dir, "large.txt"), "x".repeat(80));
+
+  const result = scanPublicSurface(dir, { maxScannedFileBytes: 32 });
+  assert.equal(result.status, "fail");
+  assert.equal(result.skippedFiles.length, 1);
+  assert.ok(result.findings.some((finding) => finding.id === "surface.file_not_scanned"));
+});

@@ -1,17 +1,26 @@
 #!/usr/bin/env node
 
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, realpathSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { diffAgentRuns } from "../src/core/diff-agent-runs.js";
 import { evaluateAgentRun } from "../src/core/evaluate-agent-run.js";
+import { normalizeJsonlTrace } from "../src/core/normalize-jsonl.js";
 import { scanPublicSurface } from "../src/core/public-safety-scan.js";
+import { validateAgentRun, validatePolicy } from "../src/core/validate-agent-run.js";
 import { renderAgentProofReport, renderScanReport } from "../src/report/markdown-report.js";
+import { createProofBundle } from "../src/report/proof-bundle.js";
+import { renderSarif } from "../src/report/sarif-report.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(__dirname, "..");
 
 function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
+}
+
+function readText(path) {
+  return readFileSync(path, "utf8");
 }
 
 function parseArgs(argv) {
@@ -49,8 +58,13 @@ function usage() {
 Deterministic release gates for synthetic AI-agent runs.
 
 Commands:
-  verify --input <file> --policy <file> [--format text|json|markdown] [--out <file>]
-  scan   --path <dir>   --policy <file> [--format text|json|markdown] [--out <file>]
+  verify    --input <file> --policy <file> [--format text|json|markdown|sarif] [--out <file>]
+  scan      --path <dir>   --policy <file> [--format text|json|markdown|sarif] [--out <file>]
+  validate  --input <file> [--policy <file>] [--format text|json]
+  normalize --input <jsonl> [--out <file>]
+  adapt     --input <jsonl> [--out <file>]
+  diff      --base <file> --candidate <file> --policy <file> [--format text|json|markdown|sarif] [--out <file>]
+  bundle    --input <file> --policy <file> --scan-path <dir> --out <file>
   report --input <file> --policy <file> --out <file>
 
 Examples:
@@ -88,6 +102,9 @@ function formatEvaluation(result, flags) {
   if (format === "markdown") {
     return renderAgentProofReport(result);
   }
+  if (format === "sarif") {
+    return `${renderSarif(result, { defaultArtifact: result.inputPath ?? "agent-run.json" })}\n`;
+  }
   if (format !== "text") {
     throw new Error(`Unsupported format: ${format}`);
   }
@@ -103,11 +120,58 @@ function formatScan(result, flags) {
   if (format === "markdown") {
     return renderScanReport(result);
   }
+  if (format === "sarif") {
+    return `${renderSarif(result, { defaultArtifact: result.rootPath ?? "." })}\n`;
+  }
   if (format !== "text") {
     throw new Error(`Unsupported format: ${format}`);
   }
 
   return `${result.status.toUpperCase()} files=${result.filesScanned} findings=${result.findings.length}\n`;
+}
+
+function formatValidation(result, flags) {
+  const format = flags.format ?? "text";
+  if (format === "json") {
+    return `${JSON.stringify(result, null, 2)}\n`;
+  }
+  if (format !== "text") {
+    throw new Error(`Unsupported format: ${format}`);
+  }
+  return `${result.status.toUpperCase()} findings=${result.findings.length}\n`;
+}
+
+function formatDiff(result, flags) {
+  const format = flags.format ?? "text";
+  if (format === "json") {
+    return `${JSON.stringify(result, null, 2)}\n`;
+  }
+  if (format === "markdown") {
+    const rows = result.newFindings.length
+      ? result.newFindings.map((finding) => `| ${finding.severity} | ${finding.id} | \`${finding.location}\` |`).join("\n")
+      : "| none | none | none |";
+    return `# Agent Run Diff
+
+Status: **${result.status.toUpperCase()}**
+
+Score delta: **${result.scoreDelta}**
+
+${result.summary}
+
+| Severity | Finding | Location |
+| --- | --- | --- |
+${rows}
+`;
+  }
+  if (format === "sarif") {
+    return `${renderSarif({ findings: result.newFindings }, {
+      defaultArtifact: result.candidate?.inputPath ?? "candidate-agent-run.json"
+    })}\n`;
+  }
+  if (format !== "text") {
+    throw new Error(`Unsupported format: ${format}`);
+  }
+  return `${result.status.toUpperCase()} scoreDelta=${result.scoreDelta} newFindings=${result.newFindings.length}\n`;
 }
 
 export async function main(argv = process.argv.slice(2), io = process) {
@@ -129,6 +193,25 @@ export async function main(argv = process.argv.slice(2), io = process) {
     return result.status === "pass" ? 0 : 1;
   }
 
+  if (command === "validate") {
+    const inputPath = resolve(requireFlag(flags, "input"));
+    const runValidation = validateAgentRun(readJson(inputPath));
+    const policyValidation = flags.policy ? validatePolicy(readJson(resolve(String(flags.policy)))) : { status: "pass", findings: [] };
+    const result = {
+      status: runValidation.status === "pass" && policyValidation.status === "pass" ? "pass" : "fail",
+      findings: [...runValidation.findings, ...policyValidation.findings]
+    };
+    writeOutput(formatValidation(result, flags), flags, io.stdout);
+    return result.status === "pass" ? 0 : 2;
+  }
+
+  if (command === "normalize" || command === "adapt") {
+    const inputPath = resolve(requireFlag(flags, "input"));
+    const run = normalizeJsonlTrace(readText(inputPath));
+    writeOutput(`${JSON.stringify(run, null, 2)}\n`, flags, io.stdout);
+    return 0;
+  }
+
   if (command === "scan") {
     const scanPath = resolve(requireFlag(flags, "path"));
     const policyPath = resolve(requireFlag(flags, "policy"));
@@ -137,6 +220,48 @@ export async function main(argv = process.argv.slice(2), io = process) {
     });
     writeOutput(formatScan(result, flags), flags, io.stdout);
     return result.status === "pass" ? 0 : 1;
+  }
+
+  if (command === "diff") {
+    const baselineArg = requireFlag(flags, "base");
+    const candidateArg = requireFlag(flags, "candidate");
+    const policyArg = requireFlag(flags, "policy");
+    const baselinePath = resolve(baselineArg);
+    const candidatePath = resolve(candidateArg);
+    const policyPath = resolve(policyArg);
+    const result = diffAgentRuns(readJson(baselinePath), readJson(candidatePath), readJson(policyPath), {
+      baselinePath: baselineArg,
+      candidatePath: candidateArg,
+      policyPath: policyArg
+    });
+    writeOutput(formatDiff(result, flags), flags, io.stdout);
+    return result.status === "pass" ? 0 : 1;
+  }
+
+  if (command === "bundle") {
+    const inputPath = resolve(requireFlag(flags, "input"));
+    const policyPath = resolve(requireFlag(flags, "policy"));
+    const scanPath = resolve(requireFlag(flags, "scan-path"));
+    const outPath = resolve(requireFlag(flags, "out"));
+    const policy = readJson(policyPath);
+    const evaluation = evaluateAgentRun(readJson(inputPath), policy, {
+      inputPath,
+      policyPath
+    });
+    const scan = scanPublicSurface(scanPath, policy, {
+      rootDir: scanPath
+    });
+    const bundle = createProofBundle({
+      evaluation,
+      scan,
+      metadata: {
+        version: "0.2.0",
+        generatedAt: "2026-06-18T00:00:00.000Z",
+        command: "npm run verify"
+      }
+    });
+    writeOutput(`${JSON.stringify(bundle, null, 2)}\n`, { out: outPath }, io.stdout);
+    return bundle.status === "pass" ? 0 : 1;
   }
 
   if (command === "report") {
@@ -154,7 +279,7 @@ export async function main(argv = process.argv.slice(2), io = process) {
   throw new Error(`Unknown command: ${command}`);
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main()
     .then((code) => {
       process.exitCode = code;

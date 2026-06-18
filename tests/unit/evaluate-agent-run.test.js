@@ -34,3 +34,27 @@ test("detects secret-shaped output without committing a secret-shaped fixture", 
   assert.equal(result.status, "fail");
   assert.ok(result.findings.some((finding) => finding.id === "secret.openai_key"));
 });
+
+test("fails closed for unknown completed action types", () => {
+  const run = structuredClone(safeRun);
+  run.actions.push({
+    id: "a-unknown",
+    type: "shell_exec",
+    target: "publish generated release notes",
+    approval: "missing",
+    outcome: "completed"
+  });
+
+  const result = evaluateAgentRun(run, policy);
+  assert.equal(result.status, "fail");
+  assert.ok(result.findings.some((finding) => finding.id === "action.unknown_type"));
+});
+
+test("requires final outputs to declare auditable claims", () => {
+  const run = structuredClone(safeRun);
+  run.outputs[0].claims = [];
+
+  const result = evaluateAgentRun(run, policy);
+  assert.equal(result.status, "fail");
+  assert.ok(result.findings.some((finding) => finding.id === "claim.no_declared_claims"));
+});

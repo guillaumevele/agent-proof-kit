@@ -13,6 +13,7 @@
     "requireSyntheticFixture": true,
     "requireDecisionTrace": true,
     "requireEvidenceForClaims": true,
+    "requireClaimsForFinalOutputs": true,
     "maxCriticalFindings": 0,
     "maxHighFindings": 0
   },

@@ -8,7 +8,7 @@ This repository is built to demonstrate AI-agent evaluation work without exposin
 - Reserved domains such as `example.com`.
 - Generic policy gates.
 - Deterministic tests.
-- Reproducible Markdown reports.
+- Reproducible Markdown, SARIF and JSON proof artifacts.
 
 ## Excluded
 
