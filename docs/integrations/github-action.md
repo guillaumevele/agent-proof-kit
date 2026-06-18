@@ -19,7 +19,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 22.x
-      - uses: guillaumevele/agent-proof-kit@v0.3.0
+      - uses: guillaumevele/agent-proof-kit@v0.4.0
         with:
           input: examples/synthetic-agent-run.json
           policy: policies/default-policy.json

@@ -8,10 +8,13 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { diffAgentRuns } from "../src/core/diff-agent-runs.js";
 import { evaluateAgentRun } from "../src/core/evaluate-agent-run.js";
+import { compilePolicyDefinition, loadPolicyFile, readPolicyDefinition } from "../src/core/policy-loader.js";
+import { createProofAttestation, verifyProofAttestation } from "../src/core/proof-signature.js";
 import { scanPublicSurface } from "../src/core/public-safety-scan.js";
 import { exportTraceFixture, supportedTraceSources } from "../src/core/trace-export.js";
 import { renderAgentProofReport, renderScanReport } from "../src/report/markdown-report.js";
 import { createProofBundle } from "../src/report/proof-bundle.js";
+import { renderProofDashboard } from "../src/report/dashboard.js";
 import { renderSarif } from "../src/report/sarif-report.js";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -30,7 +33,9 @@ const ArtifactName = {
   SARIF: "sarif",
   NORMALIZED_RUN: "normalized_run",
   REGRESSION_DIFF: "regression_diff",
-  GATE_COVERAGE: "gate_coverage"
+  GATE_COVERAGE: "gate_coverage",
+  PROOF_ATTESTATION: "proof_attestation",
+  PROOF_DASHBOARD: "proof_dashboard"
 };
 
 const generatedArtifacts = {
@@ -39,7 +44,9 @@ const generatedArtifacts = {
   [ArtifactName.SARIF]: "docs/generated/sample-agent-proof.sarif",
   [ArtifactName.NORMALIZED_RUN]: "docs/generated/normalized-agent-run.json",
   [ArtifactName.REGRESSION_DIFF]: "docs/generated/sample-agent-run-diff.json",
-  [ArtifactName.GATE_COVERAGE]: "docs/generated/gate-coverage.md"
+  [ArtifactName.GATE_COVERAGE]: "docs/generated/gate-coverage.md",
+  [ArtifactName.PROOF_ATTESTATION]: "docs/generated/proof-bundle.attestation.json",
+  [ArtifactName.PROOF_DASHBOARD]: "docs/generated/proof-dashboard.html"
 };
 
 const server = new McpServer({
@@ -87,9 +94,13 @@ Use this first when an assistant needs to understand what proof artifacts, sampl
       nextTools: [
         "agent_proof_verify_run",
         "agent_proof_scan_surface",
+        "agent_proof_compile_policy",
         "agent_proof_export_trace",
         "agent_proof_diff_runs",
         "agent_proof_create_bundle",
+        "agent_proof_sign_bundle",
+        "agent_proof_verify_bundle_signature",
+        "agent_proof_render_dashboard",
         "agent_proof_read_artifact"
       ]
     };
@@ -126,7 +137,7 @@ Use this to answer: "Does this run pass the release gate?", "Which findings bloc
   async ({ input, policy, response_format }) => toToolResult(() => {
     const inputRef = resolveInput(input, "examples/synthetic-agent-run.json", "input");
     const policyRef = resolveInput(policy, "policies/default-policy.json", "policy");
-    const evaluation = evaluateAgentRun(readJson(inputRef.path), readJson(policyRef.path), {
+    const evaluation = evaluateAgentRun(readJson(inputRef.path), loadPolicyFile(policyRef.path), {
       inputPath: inputRef.displayPath,
       policyPath: policyRef.displayPath
     });
@@ -168,7 +179,7 @@ Use this before publishing a repository or generated artifact. Paths are constra
     const scanPath = resolveWorkspacePath(scan_path, "scan_path");
     assertDirectory(scanPath.path, "scan_path");
     const policyRef = resolveInput(policy, "policies/default-policy.json", "policy");
-    const parsedPolicy = readJson(policyRef.path);
+    const parsedPolicy = loadPolicyFile(policyRef.path);
     parsedPolicy.privateTerms = [...new Set([...(parsedPolicy.privateTerms ?? []), ...(private_terms ?? [])])];
     const scan = scanPublicSurface(scanPath.path, parsedPolicy, {
       rootDir: scanPath.path,
@@ -176,6 +187,59 @@ Use this before publishing a repository or generated artifact. Paths are constra
     });
 
     return formatScan(scan, response_format);
+  })
+);
+
+server.registerTool(
+  "agent_proof_compile_policy",
+  {
+    title: "Compile Policy Definition",
+    description: `Compile a YAML or JSON policy definition into the public Agent Proof Kit policy contract.
+
+Use this when a team has a YAML policy DSL file or wants an assistant to inspect the exact compiled gates, action risks, score threshold and scan limits before verification.`,
+    inputSchema: z.object({
+      input: z.string().min(1).max(500)
+        .optional()
+        .describe("Policy YAML or JSON path under the workspace root. Omit to use the bundled YAML policy example."),
+      write_path: z.string().min(1).max(500)
+        .optional()
+        .describe("Optional compiled policy JSON path under the workspace root. Parent directories are created."),
+      response_format: z.enum([ResponseFormat.JSON, ResponseFormat.MARKDOWN])
+        .default(ResponseFormat.MARKDOWN)
+        .describe("Output format.")
+    }).strict(),
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false
+    }
+  },
+  async ({ input, write_path, response_format }) => toToolResult(() => {
+    const inputRef = resolveInput(input, "examples/policies/strict-corporate-policy.yaml", "input");
+    const policy = compilePolicyDefinition(readPolicyDefinition(inputRef.path));
+    let writtenTo = null;
+    if (write_path) {
+      const out = resolveWorkspaceWritePath(write_path, "write_path");
+      mkdirSync(dirname(out.path), { recursive: true });
+      writeFileSync(out.path, `${JSON.stringify(policy, null, 2)}\n`);
+      writtenTo = out.displayPath;
+    }
+
+    if (response_format === ResponseFormat.JSON) {
+      return JSON.stringify({ input: inputRef.displayPath, writtenTo, policy }, null, 2);
+    }
+
+    return `# Compiled Agent Proof Policy
+
+- Input: \`${inputRef.displayPath}\`
+- Policy ID: ${policy.id}
+- Minimum score: ${policy.minimumScore}
+- Max scanned file bytes: ${policy.maxScannedFileBytes}
+- Gates: ${Object.keys(policy.gates ?? {}).length}
+- Action risk rules: ${Object.keys(policy.actionRisk ?? {}).length}
+${writtenTo ? `- Written to: \`${writtenTo}\`` : "- Written to: not requested"}
+`;
   })
 );
 
@@ -189,7 +253,7 @@ Use this when onboarding a repository that has JSONL events but not yet an Agent
     inputSchema: z.object({
       from: z.enum(supportedTraceSources)
         .default("agent-proof-jsonl")
-        .describe("Trace source shape. Current supported values are agent-proof-jsonl and generic-jsonl."),
+        .describe(`Trace source shape. Supported values: ${supportedTraceSources.join(", ")}.`),
       input: z.string().min(1).max(500)
         .describe("Trace JSONL path under the workspace root."),
       redact_terms: z.array(z.string().min(1).max(200))
@@ -273,7 +337,7 @@ Use this to detect regression findings or score drops before accepting a changed
     const baseRef = resolveInput(base, "examples/synthetic-agent-run.json", "base");
     const candidateRef = resolveInput(candidate, "examples/synthetic-agent-run-regression.json", "candidate");
     const policyRef = resolveInput(policy, "policies/default-policy.json", "policy");
-    const diff = diffAgentRuns(readJson(baseRef.path), readJson(candidateRef.path), readJson(policyRef.path), {
+    const diff = diffAgentRuns(readJson(baseRef.path), readJson(candidateRef.path), loadPolicyFile(policyRef.path), {
       baselinePath: baseRef.displayPath,
       candidatePath: candidateRef.displayPath,
       policyPath: policyRef.displayPath
@@ -318,7 +382,7 @@ Use this when an assistant needs a single JSON object that combines run evaluati
     const inputRef = resolveInput(input, "examples/synthetic-agent-run.json", "input");
     const policyRef = resolveInput(policy, "policies/default-policy.json", "policy");
     const scanPath = resolveWorkspacePath(scan_path, "scan_path");
-    const parsedPolicy = readJson(policyRef.path);
+    const parsedPolicy = loadPolicyFile(policyRef.path);
     const evaluation = evaluateAgentRun(readJson(inputRef.path), parsedPolicy, {
       inputPath: inputRef.displayPath,
       policyPath: policyRef.displayPath
@@ -365,12 +429,195 @@ ${writtenTo ? `- Written to: \`${writtenTo}\`` : "- Written to: not requested"}
 );
 
 server.registerTool(
+  "agent_proof_sign_bundle",
+  {
+    title: "Sign Proof Bundle",
+    description: `Create a detached proof-bundle attestation with a canonical SHA-256 digest and, optionally, an RSA-SHA256 signature.
+
+Use this after creating or receiving a proof bundle. Provide private_key only when the user explicitly wants local cryptographic signing; otherwise the tool creates a digest-only attestation.`,
+    inputSchema: z.object({
+      bundle: z.string().min(1).max(500)
+        .optional()
+        .describe("Proof bundle JSON path under the workspace root. Omit to use the bundled sample proof bundle."),
+      private_key: z.string().min(1).max(500)
+        .optional()
+        .describe("Optional RSA private key PEM path under the workspace root for cryptographic signing."),
+      write_path: z.string().min(1).max(500)
+        .optional()
+        .describe("Optional attestation JSON path under the workspace root. Parent directories are created."),
+      response_format: z.enum([ResponseFormat.JSON, ResponseFormat.MARKDOWN])
+        .default(ResponseFormat.MARKDOWN)
+        .describe("Output format.")
+    }).strict(),
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false
+    }
+  },
+  async ({ bundle, private_key, write_path, response_format }) => toToolResult(() => {
+    const bundleRef = resolveInput(bundle, "docs/generated/proof-bundle.json", "bundle");
+    const privateKeyRef = private_key ? resolveWorkspacePath(private_key, "private_key") : null;
+    const attestation = createProofAttestation(readJson(bundleRef.path), {
+      privateKeyPem: privateKeyRef ? readFileSync(privateKeyRef.path, "utf8") : null
+    });
+    let writtenTo = null;
+    if (write_path) {
+      const out = resolveWorkspaceWritePath(write_path, "write_path");
+      mkdirSync(dirname(out.path), { recursive: true });
+      writeFileSync(out.path, `${JSON.stringify(attestation, null, 2)}\n`);
+      writtenTo = out.displayPath;
+    }
+
+    if (response_format === ResponseFormat.JSON) {
+      return JSON.stringify({ bundle: bundleRef.displayPath, writtenTo, attestation }, null, 2);
+    }
+
+    return `# Proof Bundle Attestation
+
+- Bundle: \`${bundleRef.displayPath}\`
+- Digest: \`${attestation.digest.value}\`
+- Signature: ${attestation.signature ? attestation.signature.algorithm : "not present"}
+${writtenTo ? `- Written to: \`${writtenTo}\`` : "- Written to: not requested"}
+`;
+  })
+);
+
+server.registerTool(
+  "agent_proof_verify_bundle_signature",
+  {
+    title: "Verify Proof Bundle Attestation",
+    description: `Verify that a detached attestation matches a proof bundle digest and, when a public key is provided, validate the RSA-SHA256 signature.
+
+Use this before trusting a checked-in proof bundle or CI artifact.`,
+    inputSchema: z.object({
+      bundle: z.string().min(1).max(500)
+        .optional()
+        .describe("Proof bundle JSON path under the workspace root. Omit to use the bundled sample proof bundle."),
+      attestation: z.string().min(1).max(500)
+        .optional()
+        .describe("Attestation JSON path under the workspace root. Omit to use the bundled sample attestation."),
+      public_key: z.string().min(1).max(500)
+        .optional()
+        .describe("Optional RSA public key PEM path under the workspace root for signature verification."),
+      response_format: z.enum([ResponseFormat.JSON, ResponseFormat.MARKDOWN])
+        .default(ResponseFormat.MARKDOWN)
+        .describe("Output format.")
+    }).strict(),
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false
+    }
+  },
+  async ({ bundle, attestation, public_key, response_format }) => toToolResult(() => {
+    const bundleRef = resolveInput(bundle, "docs/generated/proof-bundle.json", "bundle");
+    const attestationRef = resolveInput(attestation, "docs/generated/proof-bundle.attestation.json", "attestation");
+    const publicKeyRef = public_key ? resolveWorkspacePath(public_key, "public_key") : null;
+    const result = verifyProofAttestation(readJson(bundleRef.path), readJson(attestationRef.path), {
+      publicKeyPem: publicKeyRef ? readFileSync(publicKeyRef.path, "utf8") : null
+    });
+
+    if (response_format === ResponseFormat.JSON) {
+      return JSON.stringify({
+        bundle: bundleRef.displayPath,
+        attestation: attestationRef.displayPath,
+        result
+      }, null, 2);
+    }
+
+    return `# Proof Bundle Attestation Verification
+
+Status: **${result.status.toUpperCase()}**
+
+- Bundle: \`${bundleRef.displayPath}\`
+- Attestation: \`${attestationRef.displayPath}\`
+- Digest: ${result.digestMatches ? "match" : "mismatch"}
+- Signature: ${result.signatureVerified === null ? "not present" : result.signatureVerified ? "valid" : "invalid"}
+- Findings: ${result.findings.length}
+`;
+  })
+);
+
+server.registerTool(
+  "agent_proof_render_dashboard",
+  {
+    title: "Render Proof Dashboard",
+    description: `Render a local HTML dashboard from a proof bundle, gate coverage matrix and optional attestation.
+
+Use this when a team wants a reviewable proof artifact for pull requests, release notes or local inspection. The tool writes HTML only when write_path is provided.`,
+    inputSchema: z.object({
+      bundle: z.string().min(1).max(500)
+        .optional()
+        .describe("Proof bundle JSON path under the workspace root. Omit to use the bundled sample proof bundle."),
+      coverage: z.string().min(1).max(500)
+        .optional()
+        .describe("Gate coverage Markdown path under the workspace root. Omit to use the bundled sample coverage matrix."),
+      attestation: z.string().min(1).max(500)
+        .optional()
+        .describe("Optional attestation JSON path under the workspace root. Omit to use the bundled sample attestation."),
+      write_path: z.string().min(1).max(500)
+        .optional()
+        .describe("Optional dashboard HTML path under the workspace root. Parent directories are created."),
+      response_format: z.enum([ResponseFormat.JSON, ResponseFormat.MARKDOWN, "html"])
+        .default(ResponseFormat.MARKDOWN)
+        .describe("Output format. Use html only when the caller explicitly needs raw HTML in the response.")
+    }).strict(),
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false
+    }
+  },
+  async ({ bundle, coverage, attestation, write_path, response_format }) => toToolResult(() => {
+    const bundleRef = resolveInput(bundle, "docs/generated/proof-bundle.json", "bundle");
+    const coverageRef = resolveInput(coverage, "docs/generated/gate-coverage.md", "coverage");
+    const attestationRef = resolveInput(attestation, "docs/generated/proof-bundle.attestation.json", "attestation");
+    const html = renderProofDashboard({
+      bundle: readJson(bundleRef.path),
+      gateCoverageMarkdown: readFileSync(coverageRef.path, "utf8"),
+      attestation: readJson(attestationRef.path)
+    });
+    let writtenTo = null;
+    if (write_path) {
+      const out = resolveWorkspaceWritePath(write_path, "write_path");
+      mkdirSync(dirname(out.path), { recursive: true });
+      writeFileSync(out.path, html);
+      writtenTo = out.displayPath;
+    }
+
+    if (response_format === "html") return html;
+    if (response_format === ResponseFormat.JSON) {
+      return JSON.stringify({
+        bundle: bundleRef.displayPath,
+        coverage: coverageRef.displayPath,
+        attestation: attestationRef.displayPath,
+        writtenTo,
+        bytes: Buffer.byteLength(html)
+      }, null, 2);
+    }
+
+    return `# Agent Proof Dashboard
+
+- Bundle: \`${bundleRef.displayPath}\`
+- Coverage: \`${coverageRef.displayPath}\`
+- Attestation: \`${attestationRef.displayPath}\`
+- HTML bytes: ${Buffer.byteLength(html)}
+${writtenTo ? `- Written to: \`${writtenTo}\`` : "- Written to: not requested"}
+`;
+  })
+);
+
+server.registerTool(
   "agent_proof_read_artifact",
   {
     title: "Read Generated Proof Artifact",
     description: `Read one checked-in generated proof artifact bundled with Agent Proof Kit.
 
-Use this when an assistant needs to inspect the sample report, SARIF export, proof bundle, normalized run, regression diff, or gate coverage matrix without guessing file paths.`,
+Use this when an assistant needs to inspect the sample report, SARIF export, proof bundle, attestation, dashboard, normalized run, regression diff, or gate coverage matrix without guessing file paths.`,
     inputSchema: z.object({
       artifact: z.enum(Object.values(ArtifactName))
         .describe("Generated artifact to read."),
@@ -402,7 +649,7 @@ Use this when an assistant needs to inspect the sample report, SARIF export, pro
 
 Path: \`${path}\`
 
-\`\`\`${path.endsWith(".json") || path.endsWith(".sarif") ? "json" : "markdown"}
+\`\`\`${artifactLanguage(path)}
 ${content.trimEnd()}
 \`\`\`
 `;
@@ -544,6 +791,12 @@ ${diff.summary}
 | --- | --- | --- |
 ${rows}
 `;
+}
+
+function artifactLanguage(path) {
+  if (path.endsWith(".json") || path.endsWith(".sarif")) return "json";
+  if (path.endsWith(".html")) return "html";
+  return "markdown";
 }
 
 function renderStatus(info) {

@@ -64,6 +64,34 @@ test("validates run and policy fixtures", () => {
   assert.equal(JSON.parse(result.stdout).status, "pass");
 });
 
+test("compiles YAML policy DSL", () => {
+  const result = runCli([
+    "compile-policy",
+    "--input",
+    "examples/policies/strict-corporate-policy.yaml"
+  ]);
+  assert.equal(result.status, 0, result.stderr);
+  const payload = JSON.parse(result.stdout);
+  assert.equal(payload.id, "example-strict-corporate-yaml-policy");
+  assert.equal(payload.gates.requireEvidenceForClaims, true);
+});
+
+test("applies YAML policy DSL during verification", () => {
+  const result = runCli([
+    "verify",
+    "--input",
+    "examples/synthetic-agent-run.json",
+    "--policy",
+    "examples/policies/strict-corporate-policy.yaml",
+    "--format",
+    "json"
+  ]);
+  assert.equal(result.status, 1, result.stderr);
+  const payload = JSON.parse(result.stdout);
+  assert.equal(payload.policyId, "example-strict-corporate-yaml-policy");
+  assert.ok(payload.findings.some((finding) => finding.id === "action.high_risk_without_approval"));
+});
+
 test("normalizes JSONL traces", () => {
   const result = runCli(["normalize", "--input", "examples/synthetic-agent-events.jsonl"]);
   assert.equal(result.status, 0);
@@ -187,6 +215,51 @@ test("writes a proof bundle with current package metadata", () => {
   assert.equal(bundle.tool.version, packageVersion);
   assert.match(bundle.metadata.command, /^agent-proof bundle /);
   assert.ok(Number.isFinite(Date.parse(bundle.generatedAt)));
+});
+
+test("signs and verifies a proof bundle attestation", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agent-proof-sign-"));
+  const outPath = join(dir, "attestation.json");
+  const sign = runCli([
+    "sign-bundle",
+    "--bundle",
+    "docs/generated/proof-bundle.json",
+    "--out",
+    outPath
+  ]);
+  assert.equal(sign.status, 0, sign.stderr);
+  const attestation = JSON.parse(readFileSync(outPath, "utf8"));
+  assert.match(attestation.digest.value, /^[a-f0-9]{64}$/);
+
+  const verify = runCli([
+    "verify-bundle-signature",
+    "--bundle",
+    "docs/generated/proof-bundle.json",
+    "--signature",
+    outPath
+  ]);
+  assert.equal(verify.status, 0, verify.stderr);
+  assert.match(verify.stdout, /PASS digest=match signature=not_present/);
+});
+
+test("writes a local proof dashboard", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agent-proof-dashboard-"));
+  const outPath = join(dir, "dashboard.html");
+  const result = runCli([
+    "dashboard",
+    "--bundle",
+    "docs/generated/proof-bundle.json",
+    "--coverage",
+    "docs/generated/gate-coverage.md",
+    "--attestation",
+    "docs/generated/proof-bundle.attestation.json",
+    "--out",
+    outPath
+  ]);
+  assert.equal(result.status, 0, result.stderr);
+  const html = readFileSync(outPath, "utf8");
+  assert.match(html, /Agent Proof Dashboard/);
+  assert.match(html, /Gate Coverage Matrix/);
 });
 
 function runCli(args) {

@@ -1,0 +1,22 @@
+extends: strict-corporate
+id: example-strict-corporate-yaml-policy
+score:
+  minimum: 96
+scan:
+  maxFileBytes: 256000
+gates:
+  synthetic: required
+  decisionTrace: required
+  evidenceForClaims: required
+  claimsForFinalOutputs: required
+  maxCriticalFindings: 0
+  maxHighFindings: 0
+actions:
+  read: low
+  write: high
+  network: high
+  destructive: critical
+  secret_exposure: critical
+  professional_advice: high
+privateTerms:
+  - internal-codename

@@ -22,10 +22,13 @@ export const gateCoverageEntries = [
       "policies/open-source-policy.json",
       "policies/strict-corporate-policy.json",
       "policies/high-stakes-policy.json",
+      "examples/policies/strict-corporate-policy.yaml",
+      "src/core/policy-loader.js",
       "docs/policy-packs.md"
     ],
     verification: [
-      "tests/schema/schema.test.js"
+      "tests/schema/schema.test.js",
+      "tests/cli/cli.test.js"
     ],
     artifacts: [
       "docs/generated/gate-coverage.md"
@@ -136,7 +139,10 @@ export const gateCoverageEntries = [
     evidence: [
       "src/core/normalize-jsonl.js",
       "src/core/trace-export.js",
-      "examples/synthetic-agent-events.jsonl"
+      "examples/synthetic-agent-events.jsonl",
+      "examples/adapters/langgraph-stream.json",
+      "examples/adapters/crewai-events.jsonl",
+      "examples/adapters/autogen-run-stream.jsonl"
     ],
     verification: [
       "tests/adapter/jsonl.test.js",
@@ -185,6 +191,37 @@ export const gateCoverageEntries = [
     ],
     artifacts: [
       "docs/generated/proof-bundle.json"
+    ]
+  },
+  {
+    gate: "Proof bundle attestation",
+    evidence: [
+      "src/core/proof-signature.js",
+      "bin/agent-proof.js"
+    ],
+    verification: [
+      "tests/signature/signature.test.js",
+      "tests/cli/cli.test.js",
+      "scripts/check-machine-artifacts.js"
+    ],
+    artifacts: [
+      "docs/generated/proof-bundle.attestation.json"
+    ]
+  },
+  {
+    gate: "Local proof dashboard",
+    evidence: [
+      "src/report/dashboard.js",
+      "bin/agent-proof.js",
+      "docs/dashboard.md"
+    ],
+    verification: [
+      "tests/dashboard/dashboard.test.js",
+      "tests/cli/cli.test.js",
+      "scripts/check-machine-artifacts.js"
+    ],
+    artifacts: [
+      "docs/generated/proof-dashboard.html"
     ]
   },
   {

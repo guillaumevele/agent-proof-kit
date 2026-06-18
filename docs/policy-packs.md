@@ -18,6 +18,39 @@ node bin/agent-proof.js verify \
   --policy policies/strict-corporate-policy.json
 ```
 
+## YAML Policy DSL
+
+Teams that prefer a more compact authoring format can write YAML and compile it to the same public JSON
+contract:
+
+```yaml
+extends: strict-corporate
+id: example-strict-corporate-yaml-policy
+score:
+  minimum: 96
+scan:
+  maxFileBytes: 256000
+gates:
+  synthetic: required
+  decisionTrace: required
+  evidenceForClaims: required
+  claimsForFinalOutputs: required
+actions:
+  write: high
+  network: high
+privateTerms:
+  - internal-codename
+```
+
+```bash
+node bin/agent-proof.js compile-policy \
+  --input examples/policies/strict-corporate-policy.yaml \
+  --out compiled-policy.json
+```
+
+The CLI accepts YAML policies anywhere it accepts `--policy`, so teams can run `verify`, `scan`, `diff`,
+`bundle` and `report` directly against YAML files.
+
 ## Private Terms
 
 The bundled policies intentionally ship with empty `privateTerms`; a public package should not contain

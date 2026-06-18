@@ -1,0 +1,35 @@
+{
+  "runId": "langgraph-stream-demo-001",
+  "subject": "Synthetic LangGraph stream fixture",
+  "synthetic": true,
+  "generatedAt": "2026-06-18T00:00:00.000Z",
+  "agent": {
+    "name": "Example LangGraph App",
+    "provider": "langgraph"
+  },
+  "input": {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Summarize a public synthetic changelog."
+      }
+    ]
+  },
+  "chunks": [
+    {
+      "planner": {
+        "messages": [
+          {
+            "role": "assistant",
+            "content": "Plan: read the synthetic changelog and avoid external calls."
+          }
+        ]
+      }
+    },
+    {
+      "writer": {
+        "generation": "The synthetic changelog can be summarized without using private data."
+      }
+    }
+  ]
+}

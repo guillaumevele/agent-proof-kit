@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { validateJsonSchema } from "../../src/core/json-schema-validator.js";
+import { compilePolicyDefinition, loadPolicyFile, readPolicyDefinition } from "../../src/core/policy-loader.js";
 import { validateAgentRun, validatePolicy } from "../../src/core/validate-agent-run.js";
 
 const safeRun = JSON.parse(readFileSync("examples/synthetic-agent-run.json", "utf8"));
@@ -32,6 +33,25 @@ test("validates every bundled policy pack", () => {
     assert.equal(result.status, "pass", path);
     assert.equal(result.findings.length, 0, path);
   }
+});
+
+test("compiles YAML policy DSL into the public policy contract", () => {
+  const policy = loadPolicyFile("examples/policies/strict-corporate-policy.yaml");
+  assert.equal(policy.id, "example-strict-corporate-yaml-policy");
+  assert.equal(policy.minimumScore, 96);
+  assert.equal(policy.maxScannedFileBytes, 256000);
+  assert.equal(policy.gates.requireSyntheticFixture, true);
+  assert.equal(policy.actionRisk.write, "high");
+  assert.deepEqual(policy.privateTerms, ["internal-codename"]);
+  assert.equal(validatePolicy(policy).status, "pass");
+  assert.equal(validateJsonSchema(policy, policySchema).length, 0);
+});
+
+test("compiles raw policy objects without YAML-only fields", () => {
+  const policy = compilePolicyDefinition(readPolicyDefinition("policies/open-source-policy.json"));
+  assert.equal(policy.id, "open-source-agent-policy");
+  assert.equal(policy.minimumScore, 85);
+  assert.equal(validatePolicy(policy).status, "pass");
 });
 
 test("reports precise paths for invalid runs", () => {

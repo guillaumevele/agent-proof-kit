@@ -14,12 +14,16 @@ test("MCP server exposes practical proof workflow tools", async () => {
     const tools = await client.listTools();
     const toolNames = tools.tools.map((tool) => tool.name).sort();
     assert.deepEqual(toolNames, [
+      "agent_proof_compile_policy",
       "agent_proof_create_bundle",
       "agent_proof_diff_runs",
       "agent_proof_export_trace",
       "agent_proof_read_artifact",
+      "agent_proof_render_dashboard",
       "agent_proof_scan_surface",
+      "agent_proof_sign_bundle",
       "agent_proof_status",
+      "agent_proof_verify_bundle_signature",
       "agent_proof_verify_run"
     ]);
   } finally {
@@ -107,6 +111,46 @@ test("MCP server exports a JSONL trace fixture with redactions", async () => {
   }
 });
 
+test("MCP server exports a framework trace fixture", async () => {
+  const client = await connectClient();
+  try {
+    const result = await client.callTool({
+      name: "agent_proof_export_trace",
+      arguments: {
+        from: "langgraph-stream",
+        input: "examples/adapters/langgraph-stream.json",
+        response_format: "json"
+      }
+    });
+    const payload = JSON.parse(textContent(result));
+    assert.equal(payload.source, "langgraph-stream");
+    assert.equal(payload.run.runId, "langgraph-stream-demo-001");
+    assert.ok(payload.run.actions.length > 0);
+  } finally {
+    await client.close();
+  }
+});
+
+test("MCP server compiles a YAML policy and writes JSON output", async () => {
+  const workspace = mkdtempSync(join(tmpdir(), "agent-proof-mcp-policy-"));
+  const client = await connectClient(workspace);
+  try {
+    const result = await client.callTool({
+      name: "agent_proof_compile_policy",
+      arguments: {
+        write_path: "policies/compiled-policy.json",
+        response_format: "json"
+      }
+    });
+    const payload = JSON.parse(textContent(result));
+    assert.equal(payload.writtenTo, "policies/compiled-policy.json");
+    assert.equal(payload.policy.id, "example-strict-corporate-yaml-policy");
+    assert.ok(statSync(join(workspace, "policies", "compiled-policy.json")).isFile());
+  } finally {
+    await client.close();
+  }
+});
+
 test("MCP server can write a proof bundle inside the workspace", async () => {
   const workspace = mkdtempSync(join(tmpdir(), "agent-proof-mcp-workspace-"));
   const client = await connectClient(workspace);
@@ -125,6 +169,49 @@ test("MCP server can write a proof bundle inside the workspace", async () => {
     const written = join(workspace, "artifacts", "proof-bundle.json");
     assert.ok(statSync(written).isFile());
     assert.equal(JSON.parse(readFileSync(written, "utf8")).tool.name, "agent-proof-kit");
+  } finally {
+    await client.close();
+  }
+});
+
+test("MCP server signs, verifies and renders proof artifacts", async () => {
+  const workspace = mkdtempSync(join(tmpdir(), "agent-proof-mcp-proof-"));
+  const client = await connectClient(workspace);
+  try {
+    const sign = await client.callTool({
+      name: "agent_proof_sign_bundle",
+      arguments: {
+        write_path: "artifacts/proof-bundle.attestation.json",
+        response_format: "json"
+      }
+    });
+    const signed = JSON.parse(textContent(sign));
+    assert.equal(signed.writtenTo, "artifacts/proof-bundle.attestation.json");
+    assert.match(signed.attestation.digest.value, /^[a-f0-9]{64}$/);
+
+    const verify = await client.callTool({
+      name: "agent_proof_verify_bundle_signature",
+      arguments: {
+        attestation: "artifacts/proof-bundle.attestation.json",
+        response_format: "json"
+      }
+    });
+    const verified = JSON.parse(textContent(verify));
+    assert.equal(verified.result.status, "pass");
+    assert.equal(verified.result.digestMatches, true);
+
+    const dashboard = await client.callTool({
+      name: "agent_proof_render_dashboard",
+      arguments: {
+        attestation: "artifacts/proof-bundle.attestation.json",
+        write_path: "artifacts/proof-dashboard.html",
+        response_format: "json"
+      }
+    });
+    const rendered = JSON.parse(textContent(dashboard));
+    assert.equal(rendered.writtenTo, "artifacts/proof-dashboard.html");
+    assert.ok(rendered.bytes > 1000);
+    assert.match(readFileSync(join(workspace, "artifacts", "proof-dashboard.html"), "utf8"), /Agent Proof Dashboard/);
   } finally {
     await client.close();
   }

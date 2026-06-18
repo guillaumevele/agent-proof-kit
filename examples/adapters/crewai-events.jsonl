@@ -1,0 +1,4 @@
+{"event":"CrewKickoffStartedEvent","crew_name":"Synthetic Release Crew","task":"Summarize a public synthetic changelog."}
+{"event":"AgentExecutionCompletedEvent","agent":{"role":"Research Analyst"},"task":{"description":"Read the public synthetic changelog."},"output":"The changelog fixture is public and synthetic."}
+{"event":"AgentExecutionCompletedEvent","agent":{"role":"Release Writer"},"task":{"description":"Draft a short release note from the synthetic changelog."},"output":"Release note drafted from synthetic public material only."}
+{"event":"CrewKickoffCompletedEvent","crew_name":"Synthetic Release Crew","output":"Crew completed with a public synthetic release note."}

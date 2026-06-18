@@ -1,0 +1,4 @@
+{"type":"TextMessage","source":"user","content":"Summarize the synthetic release note without external calls."}
+{"type":"ToolCallRequestEvent","source":"assistant","content":"Inspect local synthetic fixture only."}
+{"type":"TextMessage","source":"assistant","content":"The release can be summarized from local synthetic fixtures only."}
+{"type":"TaskResult","stop_reason":"Text 'TERMINATE' mentioned"}
