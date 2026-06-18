@@ -6,6 +6,8 @@ Deterministic release gates for AI-agent runs. The kit validates a public agent-
 
 It is intentionally narrow: no provider account, no API key, no network call, no private project data.
 
+Maturity: every gate runs in CI (currently green) against the synthetic fixtures in this repo. It is designed and tested against those fixtures, not yet used in production.
+
 ## 30-Second Review
 
 ```bash
@@ -156,7 +158,7 @@ node bin/agent-proof.js verify --input examples/synthetic-agent-run.json --polic
 
 ## Public Boundary
 
-All checked-in examples and generated artifacts are synthetic and use reserved domains such as `example.com`. For downstream repositories, add project-specific names to `privateTerms`; the default scanner catches secret-shaped values, env/private-key paths and configured private terms, not unknown internal codenames by magic.
+All checked-in examples and generated artifacts are synthetic and use reserved domains such as `example.com`. For downstream repositories, add project-specific names to `privateTerms`; the default scanner catches secret-shaped values, env/private-key paths and configured private terms; it does not detect unknown internal codenames automatically.
 
 See [docs/public-boundary.md](docs/public-boundary.md) and [docs/threat-model.md](docs/threat-model.md).
 
