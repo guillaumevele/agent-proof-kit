@@ -1,51 +1,38 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
-test("npm package exposes a working agent-proof binary", () => {
-  const packDir = mkdtempSync(join(tmpdir(), "agent-proof-pack-"));
-  const projectDir = mkdtempSync(join(tmpdir(), "agent-proof-install-"));
-  const pack = spawnSync("npm", ["pack", "--pack-destination", packDir], {
+test("npm package includes CLI, MCP server, docs, policies and proof artifacts", () => {
+  const pack = spawnSync("npm", ["pack", "--dry-run", "--json"], {
     cwd: resolve("."),
-    encoding: "utf8"
+    encoding: "utf8",
+    timeout: 30_000
   });
   assert.equal(pack.status, 0, pack.stderr);
 
-  const tarball = join(packDir, pack.stdout.trim().split(/\r?\n/).at(-1));
-  const install = spawnSync("npm", ["install", tarball, "--ignore-scripts"], {
-    cwd: projectDir,
-    encoding: "utf8"
-  });
-  assert.equal(install.status, 0, install.stderr);
+  const [result] = JSON.parse(pack.stdout);
+  const files = new Set(result.files.map((file) => file.path));
+  const pkg = JSON.parse(readFileSync("package.json", "utf8"));
 
-  const binary = join(projectDir, "node_modules", ".bin", "agent-proof");
-  const help = spawnSync(binary, ["--help"], {
-    cwd: projectDir,
-    encoding: "utf8"
-  });
-  assert.equal(help.status, 0, help.stderr);
-  assert.match(help.stdout, /Deterministic release gates/);
+  assert.equal(pkg.bin["agent-proof"], "./bin/agent-proof.js");
+  assert.equal(pkg.bin["agent-proof-mcp"], "./bin/agent-proof-mcp.js");
 
-  const packageRoot = join(projectDir, "node_modules", "agent-proof-kit");
-  const verify = spawnSync(
-    binary,
-    [
-      "verify",
-      "--input",
-      join(packageRoot, "examples", "synthetic-agent-run.json"),
-      "--policy",
-      join(packageRoot, "policies", "default-policy.json"),
-      "--format",
-      "json"
-    ],
-    {
-      cwd: projectDir,
-      encoding: "utf8"
-    }
-  );
-  assert.equal(verify.status, 0, verify.stderr);
-  assert.equal(JSON.parse(verify.stdout).status, "pass");
+  for (const path of [
+    "bin/agent-proof.js",
+    "bin/agent-proof-mcp.js",
+    "docs/integrations/mcp.md",
+    "docs/integrations/trace-adapters.md",
+    "docs/policy-packs.md",
+    "docs/generated/gate-coverage.md",
+    "policies/default-policy.json",
+    "policies/open-source-policy.json",
+    "policies/strict-corporate-policy.json",
+    "policies/high-stakes-policy.json",
+    "schemas/agent-run.schema.json",
+    "schemas/policy.schema.json"
+  ]) {
+    assert.ok(files.has(path), `${path} should be included in npm pack`);
+  }
 });

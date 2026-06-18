@@ -13,6 +13,7 @@ npm run verify
 node bin/agent-proof.js verify --input examples/synthetic-agent-run.json --policy policies/default-policy.json
 node bin/agent-proof.js diff --base examples/synthetic-agent-run.json --candidate examples/synthetic-agent-run-regression.json --policy policies/default-policy.json
 node bin/agent-proof.js verify --input examples/synthetic-agent-run-regression.json --policy policies/default-policy.json --format sarif
+node bin/agent-proof.js export --from agent-proof-jsonl --input examples/synthetic-agent-events.jsonl --redact-terms internal-codename --out agent-run.synthetic.json
 ```
 
 Expected output:
@@ -83,7 +84,7 @@ Machine-readable artifacts:
 ## GitHub Action
 
 ```yaml
-- uses: guillaumevele/agent-proof-kit@v0.2.1
+- uses: guillaumevele/agent-proof-kit@v0.3.0
   with:
     input: examples/synthetic-agent-run.json
     policy: policies/default-policy.json
@@ -92,6 +93,26 @@ Machine-readable artifacts:
 ```
 
 See [docs/integrations/github-action.md](docs/integrations/github-action.md).
+
+## MCP Server
+
+Agent Proof Kit also ships a local stdio MCP server so assistants can run the release gates without memorizing CLI flags:
+
+```json
+{
+  "mcpServers": {
+    "agent-proof-kit": {
+      "command": "npx",
+      "args": ["--yes", "--package", "agent-proof-kit", "agent-proof-mcp"],
+      "env": {
+        "AGENT_PROOF_ROOT": "/path/to/repository"
+      }
+    }
+  }
+}
+```
+
+Available MCP tools cover status, trace export, run verification, public-surface scan, run diff, proof-bundle creation and generated-artifact reading. See [docs/integrations/mcp.md](docs/integrations/mcp.md).
 
 ## Policy Surface
 
@@ -110,6 +131,15 @@ The default policy checks:
 
 Policies are JSON files so teams can tune risk categories, score thresholds, and private terms without changing the CLI.
 
+Bundled policy packs:
+
+- [default-policy.json](policies/default-policy.json)
+- [open-source-policy.json](policies/open-source-policy.json)
+- [strict-corporate-policy.json](policies/strict-corporate-policy.json)
+- [high-stakes-policy.json](policies/high-stakes-policy.json)
+
+See [docs/policy-packs.md](docs/policy-packs.md).
+
 ## Public Boundary
 
 All checked-in examples and generated artifacts are synthetic and use reserved domains such as `example.com`. For downstream repositories, add project-specific names to `privateTerms`; the default scanner catches secret-shaped values, env/private-key paths and configured private terms, not unknown internal codenames by magic.
@@ -121,6 +151,7 @@ See [docs/public-boundary.md](docs/public-boundary.md) and [docs/threat-model.md
 ```text
 action.yml                         reusable composite GitHub Action
 bin/agent-proof.js                 CLI entry point
+bin/agent-proof-mcp.js             local stdio MCP server
 schemas/                           public JSON contracts
 src/core/evaluate-agent-run.js     deterministic policy engine
 src/core/diff-agent-runs.js        baseline/candidate regression diff
@@ -129,7 +160,7 @@ src/core/public-safety-scan.js     repository surface scanner
 src/report/                        Markdown, SARIF and proof-bundle renderers
 examples/                          synthetic agent traces
 policies/                          JSON policy gates
-tests/                             unit, CLI, schema, adapter, diff, SARIF and pack tests
+tests/                             unit, CLI, MCP, schema, adapter, diff, SARIF and pack tests
 docs/generated/                    reproducible proof artifacts
 docs/threat-model.md               public threat model and release rule
 ```

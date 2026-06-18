@@ -33,7 +33,7 @@ export function buildMachineArtifacts() {
     evaluation,
     scan,
     metadata: {
-      version: "0.2.1",
+      version: "0.3.0",
       generatedAt: "2026-06-18T00:00:00.000Z",
       command: "npm run verify",
       repository: "guillaumevele/agent-proof-kit",

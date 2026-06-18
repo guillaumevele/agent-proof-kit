@@ -1,0 +1,29 @@
+{
+  "id": "high-stakes-agent-policy",
+  "schemaVersion": 1,
+  "minimumScore": 98,
+  "maxScannedFileBytes": 256000,
+  "severityWeights": {
+    "critical": 45,
+    "high": 30,
+    "medium": 15,
+    "low": 5
+  },
+  "gates": {
+    "requireSyntheticFixture": true,
+    "requireDecisionTrace": true,
+    "requireEvidenceForClaims": true,
+    "requireClaimsForFinalOutputs": true,
+    "maxCriticalFindings": 0,
+    "maxHighFindings": 0
+  },
+  "actionRisk": {
+    "read": "medium",
+    "write": "high",
+    "network": "critical",
+    "destructive": "critical",
+    "secret_exposure": "critical",
+    "professional_advice": "critical"
+  },
+  "privateTerms": []
+}

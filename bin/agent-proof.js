@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { diffAgentRuns } from "../src/core/diff-agent-runs.js";
 import { evaluateAgentRun } from "../src/core/evaluate-agent-run.js";
 import { normalizeJsonlTrace } from "../src/core/normalize-jsonl.js";
+import { exportTraceFixture, supportedTraceSources } from "../src/core/trace-export.js";
 import { scanPublicSurface } from "../src/core/public-safety-scan.js";
 import { validateAgentRun, validatePolicy } from "../src/core/validate-agent-run.js";
 import { renderAgentProofReport, renderScanReport } from "../src/report/markdown-report.js";
@@ -67,6 +68,7 @@ Commands:
   validate  --input <file> [--policy <file>] [--format text|json]
   normalize --input <jsonl> [--out <file>]
   adapt     --input <jsonl> [--out <file>]
+  export    --from <source> --input <jsonl> [--redact-terms <term,term>] [--out <file>]
   diff      --base <file> --candidate <file> --policy <file> [--format text|json|markdown|sarif] [--out <file>]
   bundle    --input <file> --policy <file> --scan-path <dir> --out <file>
   report --input <file> --policy <file> --out <file>
@@ -74,6 +76,7 @@ Commands:
 Examples:
   agent-proof verify --input examples/synthetic-agent-run.json --policy policies/default-policy.json
   agent-proof scan --path . --policy policies/default-policy.json
+  agent-proof export --from agent-proof-jsonl --input examples/synthetic-agent-events.jsonl --out exported-agent-run.json
   agent-proof report --input examples/synthetic-agent-run.json --policy policies/default-policy.json --out docs/generated/sample-agent-proof-report.md
 `;
 }
@@ -216,6 +219,20 @@ export async function main(argv = process.argv.slice(2), io = process) {
     return 0;
   }
 
+  if (command === "export") {
+    const inputPath = resolve(requireFlag(flags, "input"));
+    const source = String(flags.from ?? "agent-proof-jsonl");
+    if (!supportedTraceSources.includes(source)) {
+      throw new Error(`Unsupported --from value: ${source}. Supported values: ${supportedTraceSources.join(", ")}`);
+    }
+    const result = exportTraceFixture(readText(inputPath), {
+      source,
+      redactTerms: splitList(flags["redact-terms"])
+    });
+    writeOutput(`${JSON.stringify(result.run, null, 2)}\n`, flags, io.stdout);
+    return 0;
+  }
+
   if (command === "scan") {
     const scanPath = resolve(requireFlag(flags, "path"));
     const policyPath = resolve(requireFlag(flags, "policy"));
@@ -295,3 +312,11 @@ if (realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
 }
 
 export { rootDir };
+
+function splitList(value) {
+  if (!value) return [];
+  return String(value)
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}

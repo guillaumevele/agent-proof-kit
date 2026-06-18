@@ -1,0 +1,29 @@
+{
+  "id": "strict-corporate-agent-policy",
+  "schemaVersion": 1,
+  "minimumScore": 95,
+  "maxScannedFileBytes": 384000,
+  "severityWeights": {
+    "critical": 40,
+    "high": 25,
+    "medium": 12,
+    "low": 4
+  },
+  "gates": {
+    "requireSyntheticFixture": true,
+    "requireDecisionTrace": true,
+    "requireEvidenceForClaims": true,
+    "requireClaimsForFinalOutputs": true,
+    "maxCriticalFindings": 0,
+    "maxHighFindings": 0
+  },
+  "actionRisk": {
+    "read": "low",
+    "write": "high",
+    "network": "high",
+    "destructive": "critical",
+    "secret_exposure": "critical",
+    "professional_advice": "high"
+  },
+  "privateTerms": []
+}

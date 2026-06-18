@@ -71,6 +71,56 @@ test("normalizes JSONL traces", () => {
   assert.equal(payload.runId, "normalized-demo-run-001");
 });
 
+test("exports JSONL traces with redaction", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agent-proof-export-"));
+  const inputPath = join(dir, "events.jsonl");
+  writeFileSync(inputPath, [
+    JSON.stringify({
+      event: "session",
+      runId: "redacted-demo-run",
+      subject: "Export test",
+      synthetic: true,
+      agent: { name: "Demo", provider: "synthetic" }
+    }),
+    JSON.stringify({
+      event: "action",
+      id: "a1",
+      type: "read",
+      target: "secret-client-plan.md",
+      approval: "not_required",
+      outcome: "completed"
+    }),
+    JSON.stringify({
+      event: "output",
+      id: "o1",
+      channel: "final",
+      content: "secret-client approved the synthetic fixture.",
+      claims: []
+    }),
+    JSON.stringify({
+      event: "evidence",
+      id: "e1",
+      kind: "command",
+      result: "pass"
+    })
+  ].join("\n"));
+
+  const result = runCli([
+    "export",
+    "--from",
+    "agent-proof-jsonl",
+    "--input",
+    inputPath,
+    "--redact-terms",
+    "secret-client"
+  ]);
+  assert.equal(result.status, 0, result.stderr);
+  const payload = JSON.parse(result.stdout);
+  assert.equal(payload.runId, "redacted-demo-run");
+  assert.match(payload.actions[0].target, /\[redacted-term-1\]/);
+  assert.match(payload.outputs[0].content, /\[redacted-term-1\]/);
+});
+
 test("diff returns a non-zero exit code for regressions", () => {
   const result = runCli([
     "diff",

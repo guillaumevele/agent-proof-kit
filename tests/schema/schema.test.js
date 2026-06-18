@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { validateJsonSchema } from "../../src/core/json-schema-validator.js";
 import { validateAgentRun, validatePolicy } from "../../src/core/validate-agent-run.js";
 
@@ -19,6 +19,19 @@ test("validates the default policy", () => {
   const result = validatePolicy(policy);
   assert.equal(result.status, "pass");
   assert.equal(result.findings.length, 0);
+});
+
+test("validates every bundled policy pack", () => {
+  const policyPaths = readdirSync("policies")
+    .filter((file) => file.endsWith(".json"))
+    .map((file) => `policies/${file}`)
+    .sort();
+
+  for (const path of policyPaths) {
+    const result = validatePolicy(JSON.parse(readFileSync(path, "utf8")));
+    assert.equal(result.status, "pass", path);
+    assert.equal(result.findings.length, 0, path);
+  }
 });
 
 test("reports precise paths for invalid runs", () => {

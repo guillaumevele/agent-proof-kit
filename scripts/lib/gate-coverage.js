@@ -16,6 +16,22 @@ export const gateCoverageEntries = [
     ]
   },
   {
+    gate: "Versioned policy packs",
+    evidence: [
+      "policies/default-policy.json",
+      "policies/open-source-policy.json",
+      "policies/strict-corporate-policy.json",
+      "policies/high-stakes-policy.json",
+      "docs/policy-packs.md"
+    ],
+    verification: [
+      "tests/schema/schema.test.js"
+    ],
+    artifacts: [
+      "docs/generated/gate-coverage.md"
+    ]
+  },
+  {
     gate: "Runtime schema validation",
     evidence: [
       "src/core/validate-agent-run.js",
@@ -116,13 +132,15 @@ export const gateCoverageEntries = [
     ]
   },
   {
-    gate: "JSONL trace adapter",
+    gate: "JSONL trace adapter and export",
     evidence: [
       "src/core/normalize-jsonl.js",
+      "src/core/trace-export.js",
       "examples/synthetic-agent-events.jsonl"
     ],
     verification: [
-      "tests/adapter/jsonl.test.js"
+      "tests/adapter/jsonl.test.js",
+      "tests/cli/cli.test.js"
     ],
     artifacts: [
       "docs/generated/normalized-agent-run.json",
@@ -184,9 +202,25 @@ export const gateCoverageEntries = [
     ]
   },
   {
+    gate: "MCP stdio server",
+    evidence: [
+      "bin/agent-proof-mcp.js",
+      "docs/integrations/mcp.md"
+    ],
+    verification: [
+      "tests/mcp/mcp.test.js",
+      "package.json"
+    ],
+    artifacts: [
+      "docs/generated/gate-coverage.md",
+      "docs/generated/proof-bundle.json"
+    ]
+  },
+  {
     gate: "Packaged CLI smoke test",
     evidence: [
       "bin/agent-proof.js",
+      "bin/agent-proof-mcp.js",
       "package.json"
     ],
     verification: [

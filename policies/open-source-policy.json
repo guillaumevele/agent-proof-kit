@@ -1,0 +1,29 @@
+{
+  "id": "open-source-agent-policy",
+  "schemaVersion": 1,
+  "minimumScore": 85,
+  "maxScannedFileBytes": 512000,
+  "severityWeights": {
+    "critical": 35,
+    "high": 20,
+    "medium": 8,
+    "low": 2
+  },
+  "gates": {
+    "requireSyntheticFixture": true,
+    "requireDecisionTrace": true,
+    "requireEvidenceForClaims": true,
+    "requireClaimsForFinalOutputs": true,
+    "maxCriticalFindings": 0,
+    "maxHighFindings": 0
+  },
+  "actionRisk": {
+    "read": "low",
+    "write": "medium",
+    "network": "high",
+    "destructive": "critical",
+    "secret_exposure": "critical",
+    "professional_advice": "high"
+  },
+  "privateTerms": []
+}
