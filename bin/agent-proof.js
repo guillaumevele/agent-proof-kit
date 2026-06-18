@@ -23,6 +23,10 @@ function readText(path) {
   return readFileSync(path, "utf8");
 }
 
+function packageVersion() {
+  return readJson(resolve(rootDir, "package.json")).version;
+}
+
 function parseArgs(argv) {
   const flags = {};
   const positionals = [];
@@ -255,9 +259,9 @@ export async function main(argv = process.argv.slice(2), io = process) {
       evaluation,
       scan,
       metadata: {
-        version: "0.2.0",
-        generatedAt: "2026-06-18T00:00:00.000Z",
-        command: "npm run verify"
+        version: packageVersion(),
+        generatedAt: new Date().toISOString(),
+        command: `agent-proof bundle --input ${flags.input} --policy ${flags.policy} --scan-path ${flags["scan-path"]}`
       }
     });
     writeOutput(`${JSON.stringify(bundle, null, 2)}\n`, { out: outPath }, io.stdout);

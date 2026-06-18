@@ -7,14 +7,14 @@ export function scanText(value, context, policy = {}) {
 
   for (const pattern of patterns) {
     const regex = compilePattern(pattern);
-    const matches = text.match(regex) ?? [];
+    const matches = text.matchAll(regex);
     for (const match of matches) {
       findings.push({
         id: `secret.${pattern.id}`,
         severity: pattern.severity ?? "critical",
         title: `Secret-shaped value detected: ${pattern.id}`,
-        location: context,
-        evidence: maskSecret(match),
+        location: locationWithPosition(context, text, match.index ?? 0),
+        evidence: maskSecret(match[0]),
         recommendation: "Replace the value with a placeholder and rotate the credential if it was real."
       });
     }
@@ -28,7 +28,7 @@ export function scanText(value, context, policy = {}) {
         id: "privacy.private_term",
         severity: "high",
         title: "Private term detected",
-        location: context,
+        location: locationWithPosition(context, text, index),
         evidence: `${String(term).slice(0, 3)}...`,
         recommendation: "Move this example to a synthetic fixture or replace it with a neutral placeholder."
       });
@@ -41,6 +41,17 @@ export function scanText(value, context, policy = {}) {
 export function maskSecret(secret) {
   if (secret.length <= 8) return "[redacted]";
   return `${secret.slice(0, 4)}...${secret.slice(-4)}`;
+}
+
+function locationWithPosition(context, text, index) {
+  if (String(context).startsWith("$")) return context;
+
+  const before = text.slice(0, index);
+  const line = before.split("\n").length;
+  const lastNewline = before.lastIndexOf("\n");
+  const column = index - lastNewline;
+
+  return `${context}:${line}:${column}`;
 }
 
 export function collectTextNodes(value, prefix = "$") {

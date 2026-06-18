@@ -31,6 +31,7 @@ FAIL scoreDelta=-40 newFindings=2
 - Unknown action types fail closed until the policy classifies them.
 - Oversized unscanned files fail the public-surface scan instead of being skipped silently.
 - Generated Markdown, SARIF and JSON proof bundles are reproducible and checked in CI.
+- Every public gate is mapped to implementation files, verification paths and generated proof.
 
 ## What It Does Not Claim
 
@@ -55,6 +56,8 @@ FAIL scoreDelta=-40 newFindings=2
 | `npm run report:verify` | Fails when the generated report is stale. |
 | `npm run artifacts:generate` | Regenerates JSON, SARIF and proof-bundle artifacts. |
 | `npm run artifacts:verify` | Validates generated machine artifacts, freshness and local path hygiene without rewriting them. |
+| `npm run coverage:generate` | Regenerates the gate coverage matrix. |
+| `npm run coverage:verify` | Fails when the gate coverage matrix is stale or references missing files. |
 | `npm run refresh` | Regenerates all checked-in generated artifacts. |
 | `npm run verify` | Runs the full local and CI gate. |
 
@@ -75,11 +78,12 @@ Machine-readable artifacts:
 - [SARIF export](docs/generated/sample-agent-proof.sarif)
 - [Normalized JSONL trace](docs/generated/normalized-agent-run.json)
 - [Regression diff](docs/generated/sample-agent-run-diff.json)
+- [Gate coverage matrix](docs/generated/gate-coverage.md)
 
 ## GitHub Action
 
 ```yaml
-- uses: guillaumevele/agent-proof-kit@v0.2.0
+- uses: guillaumevele/agent-proof-kit@v0.2.1
   with:
     input: examples/synthetic-agent-run.json
     policy: policies/default-policy.json
@@ -108,9 +112,9 @@ Policies are JSON files so teams can tune risk categories, score thresholds, and
 
 ## Public Boundary
 
-All examples are synthetic and use reserved domains such as `example.com`. The repository is designed to be reviewed publicly without exposing any private app, customer, user trace, prompt, token, or production workflow.
+All checked-in examples and generated artifacts are synthetic and use reserved domains such as `example.com`. For downstream repositories, add project-specific names to `privateTerms`; the default scanner catches secret-shaped values, env/private-key paths and configured private terms, not unknown internal codenames by magic.
 
-See [docs/public-boundary.md](docs/public-boundary.md).
+See [docs/public-boundary.md](docs/public-boundary.md) and [docs/threat-model.md](docs/threat-model.md).
 
 ## Project Map
 
@@ -127,6 +131,7 @@ examples/                          synthetic agent traces
 policies/                          JSON policy gates
 tests/                             unit, CLI, schema, adapter, diff, SARIF and pack tests
 docs/generated/                    reproducible proof artifacts
+docs/threat-model.md               public threat model and release rule
 ```
 
 ## Roadmap

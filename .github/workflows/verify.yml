@@ -35,6 +35,17 @@ jobs:
       - name: Verify
         run: npm run verify
 
+      - name: Publish proof summary
+        if: always()
+        run: |
+          {
+            echo "## Agent Proof Report"
+            cat docs/generated/sample-agent-proof-report.md
+            echo
+            echo "## Gate Coverage"
+            cat docs/generated/gate-coverage.md
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload generated proof report
         uses: actions/upload-artifact@v7
         if: always()
@@ -44,6 +55,7 @@ jobs:
             docs/generated/sample-agent-proof-report.md
             docs/generated/proof-bundle.json
             docs/generated/sample-agent-proof.sarif
+            docs/generated/gate-coverage.md
           if-no-files-found: ignore
 
   action-smoke:

@@ -35,3 +35,7 @@ git grep -nE 'sk-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9_]{30,}|AIza[0-9A-Za-z_-
 ```
 
 The project scan is the source of truth; the manual grep is an extra reviewer convenience.
+
+Downstream repositories should populate `policy.privateTerms` with internal product names, customer names,
+staging domains and codenames before relying on the public-surface scan. The default policy cannot detect
+private terms it has not been given.

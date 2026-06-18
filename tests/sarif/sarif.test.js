@@ -36,3 +36,20 @@ test("renders SARIF for diff regressions", () => {
   const hit = sarif.runs[0].results.find((item) => item.ruleId === "action.unknown_type");
   assert.equal(hit.locations[0].physicalLocation.artifactLocation.uri, "examples/synthetic-agent-run-regression.json");
 });
+
+test("maps file line and column locations into SARIF regions", () => {
+  const sarif = JSON.parse(renderSarif({
+    findings: [
+      {
+        id: "secret.openai_key",
+        severity: "critical",
+        title: "Secret-shaped value detected",
+        location: "docs/example.md:7:5"
+      }
+    ]
+  }));
+  const location = sarif.runs[0].results[0].locations[0].physicalLocation;
+  assert.equal(location.artifactLocation.uri, "docs/example.md");
+  assert.equal(location.region.startLine, 7);
+  assert.equal(location.region.startColumn, 5);
+});

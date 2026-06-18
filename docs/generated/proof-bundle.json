@@ -3,7 +3,7 @@
   "generatedAt": "2026-06-18T00:00:00.000Z",
   "tool": {
     "name": "agent-proof-kit",
-    "version": "0.2.0"
+    "version": "0.2.1"
   },
   "subject": "Synthetic release assistant trial",
   "status": "pass",
@@ -65,7 +65,7 @@
   "scan": {
     "status": "pass",
     "rootPath": ".",
-    "filesScanned": 57,
+    "filesScanned": 62,
     "skippedFiles": [],
     "findings": []
   },

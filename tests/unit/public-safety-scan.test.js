@@ -28,8 +28,12 @@ test("detects secret-shaped text and private terms", () => {
 
   const result = scanPublicSurface(dir, policy);
   assert.equal(result.status, "fail");
-  assert.ok(result.findings.some((finding) => finding.id === "secret.openai_key"));
-  assert.ok(result.findings.some((finding) => finding.id === "privacy.private_term"));
+  const secret = result.findings.find((finding) => finding.id === "secret.openai_key");
+  const privateTerm = result.findings.find((finding) => finding.id === "privacy.private_term");
+  assert.ok(secret);
+  assert.ok(privateTerm);
+  assert.match(secret.location, /^trace\.md:1:\d+$/);
+  assert.match(privateTerm.location, /^trace\.md:1:\d+$/);
 });
 
 test("fails when a file is too large to scan", () => {

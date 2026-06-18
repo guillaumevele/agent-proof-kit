@@ -14,6 +14,7 @@ flowchart LR
   Result --> Report[Markdown proof report]
   Result --> Sarif[SARIF export]
   Result --> Bundle[Proof bundle JSON]
+  Repo --> Coverage[Gate coverage matrix]
   Repo[Public repository] --> Scan[Public surface scanner]
   Scan --> Result
 ```
@@ -26,6 +27,7 @@ flowchart LR
 - CI-friendly: all gates run with Node.js and no runtime dependencies.
 - Narrow claims: the project verifies specific invariants, not model quality.
 - Fail closed: unknown action types and unscanned files are blocking findings.
+- Traceable claims: every public gate is mapped to implementation files, verification paths and generated proof.
 
 ## Core Invariants
 
@@ -38,6 +40,7 @@ flowchart LR
 | Evidence coverage | Keeps public claims attached to reproducible proof. |
 | High-risk containment | Forces approval, blocking, refusal, or redaction paths. |
 | Public surface scan | Catches credential-shaped values, configured private terms and unscanned files before push. |
+| Gate coverage matrix | Shows where each public claim is implemented, tested and represented in generated artifacts. |
 
 ## Extension Points
 

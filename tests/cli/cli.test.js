@@ -1,11 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 
 const cli = resolve("bin/agent-proof.js");
+const packageVersion = JSON.parse(readFileSync("package.json", "utf8")).version;
 
 test("prints help", () => {
   const result = runCli(["--help"]);
@@ -98,6 +99,44 @@ test("emits SARIF for unsafe verification", () => {
   const sarif = JSON.parse(result.stdout);
   assert.equal(sarif.version, "2.1.0");
   assert.ok(sarif.runs[0].results.length > 0);
+});
+
+test("writes a Markdown report", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agent-proof-report-"));
+  const outPath = join(dir, "report.md");
+  const result = runCli([
+    "report",
+    "--input",
+    "examples/synthetic-agent-run.json",
+    "--policy",
+    "policies/default-policy.json",
+    "--out",
+    outPath
+  ]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(readFileSync(outPath, "utf8"), /^# Agent Proof Report/);
+});
+
+test("writes a proof bundle with current package metadata", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agent-proof-bundle-"));
+  writeFileSync(join(dir, "README.md"), "Public synthetic fixture only.\n");
+  const outPath = join(dir, "proof-bundle.json");
+  const result = runCli([
+    "bundle",
+    "--input",
+    "examples/synthetic-agent-run.json",
+    "--policy",
+    "policies/default-policy.json",
+    "--scan-path",
+    dir,
+    "--out",
+    outPath
+  ]);
+  assert.equal(result.status, 0, result.stderr);
+  const bundle = JSON.parse(readFileSync(outPath, "utf8"));
+  assert.equal(bundle.tool.version, packageVersion);
+  assert.match(bundle.metadata.command, /^agent-proof bundle /);
+  assert.ok(Number.isFinite(Date.parse(bundle.generatedAt)));
 });
 
 function runCli(args) {

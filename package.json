@@ -1,6 +1,6 @@
 {
   "name": "agent-proof-kit",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Deterministic release gates for AI agent runs, backed by synthetic fixtures.",
   "type": "module",
   "private": false,
@@ -30,8 +30,10 @@
     "report:verify": "node scripts/check-generated-report.js",
     "artifacts:generate": "node scripts/generate-machine-artifacts.js",
     "artifacts:verify": "node scripts/check-machine-artifacts.js",
-    "refresh": "npm run report:generate && npm run artifacts:generate",
-    "verify": "npm run test:unit && npm run test:schema && npm run test:adapter && npm run test:diff && npm run test:sarif && npm run test:cli && npm run test:pack && npm run report:verify && npm run artifacts:verify && npm run scan:leaks && npm run scan:generated"
+    "coverage:generate": "node scripts/generate-gate-coverage.js",
+    "coverage:verify": "node scripts/check-gate-coverage.js",
+    "refresh": "npm run report:generate && npm run artifacts:generate && npm run coverage:generate",
+    "verify": "npm run test:unit && npm run test:schema && npm run test:adapter && npm run test:diff && npm run test:sarif && npm run test:cli && npm run test:pack && npm run report:verify && npm run artifacts:verify && npm run coverage:verify && npm run scan:leaks && npm run scan:generated"
   },
   "engines": {
     "node": ">=20.11"
