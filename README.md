@@ -1,12 +1,22 @@
 # Agent Proof Kit
 
 [![Verify](https://github.com/guillaumevele/agent-proof-kit/actions/workflows/verify.yml/badge.svg)](https://github.com/guillaumevele/agent-proof-kit/actions/workflows/verify.yml)
+[![npm](https://img.shields.io/npm/v/agent-proof-kit.svg)](https://www.npmjs.com/package/agent-proof-kit)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Deterministic release gates for AI-agent runs. The kit validates a public agent-run contract, evaluates safety and provenance invariants, scans the repository surface, exports SARIF, produces a proof bundle, and can run as a GitHub Action.
 
 It is intentionally narrow: no provider account, no API key, no network call, no private project data.
 
 Maturity: every gate runs in CI (currently green) against the synthetic fixtures in this repo. It is designed and tested against those fixtures, not yet used in production.
+
+## Install
+
+```bash
+npm install -g agent-proof-kit          # provides `agent-proof` and `agent-proof-mcp`
+# or run without installing:
+npx agent-proof verify --input examples/synthetic-agent-run.json --policy policies/default-policy.json
+```
 
 ## 30-Second Review
 
