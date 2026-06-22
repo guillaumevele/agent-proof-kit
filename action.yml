@@ -1,6 +1,9 @@
 name: Agent Proof Kit
 description: Deterministic release gates for synthetic AI-agent runs.
 author: Guillaume Vele
+branding:
+  icon: shield
+  color: green
 inputs:
   input:
     description: Path to an Agent Proof Kit agent-run JSON file.
