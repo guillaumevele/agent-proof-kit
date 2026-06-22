@@ -1,6 +1,6 @@
 {
   "name": "agent-proof-kit",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Deterministic release gates for AI agent runs, backed by synthetic fixtures.",
   "type": "module",
   "private": false,
