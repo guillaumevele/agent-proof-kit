@@ -14,6 +14,14 @@ jobs:
       contents: read
       id-token: write  # npm provenance (signed, verifiable supply chain)
     steps:
+      # Probe whether the npm token is configured, without putting the secret in
+      # scope of later steps: HAS_TOKEN is only the boolean (secret != ''), not the
+      # token. The publish step keys its `if:` off this output (secrets.* is not
+      # permitted directly in `if:`).
+      - id: token
+        env:
+          HAS_TOKEN: ${{ secrets.NPM_TOKEN != '' }}
+        run: echo "has_token=$HAS_TOKEN" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
         with:
@@ -23,7 +31,7 @@ jobs:
       - name: Verify (full proof gate)
         run: npm run verify
       - name: Publish (with provenance)
-        if: ${{ secrets.NPM_TOKEN != '' }}   # clean skip when no token configured
+        if: steps.token.outputs.has_token == 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}   # least privilege: token only on this step
         run: npm publish --provenance --access public
