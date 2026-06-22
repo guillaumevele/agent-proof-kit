@@ -13,8 +13,6 @@ jobs:
     permissions:
       contents: read
       id-token: write  # npm provenance (signed, verifiable supply chain)
-    env:
-      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
@@ -25,5 +23,7 @@ jobs:
       - name: Verify (full proof gate)
         run: npm run verify
       - name: Publish (with provenance)
-        if: ${{ env.NODE_AUTH_TOKEN != '' }}   # skip cleanly when no npm token is configured
+        if: ${{ secrets.NPM_TOKEN != '' }}   # clean skip when no token configured
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}   # least privilege: token only on this step
         run: npm publish --provenance --access public

@@ -65,7 +65,7 @@
   "scan": {
     "status": "pass",
     "rootPath": ".",
-    "filesScanned": 83,
+    "filesScanned": 84,
     "skippedFiles": [],
     "findings": []
   },
