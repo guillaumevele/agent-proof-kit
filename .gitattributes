@@ -1,2 +1,2 @@
+* text=auto eol=lf
 examples/bytefence/cases/**/*.bin binary
-examples/bytefence/**/*.json text eol=lf
