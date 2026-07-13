@@ -5,6 +5,7 @@ import {
   linkSync,
   mkdirSync,
   mkdtempSync,
+  renameSync,
   symlinkSync,
   unlinkSync,
   writeFileSync
@@ -163,11 +164,22 @@ test("refuses a target before reading beyond the configured byte limit", () => {
 test("refuses a target whose inode changes after inspection", () => {
   const root = fixtureRoot();
   const path = join(root, "target.txt");
+  const replacement = join(root, "replacement.txt");
   writeFileSync(path, "before\n");
+  writeFileSync(replacement, "after\n");
   const inspected = inspectByteFenceTarget({ root, targetPath: "target.txt" });
+  const replacementInspected = inspectByteFenceTarget({
+    root,
+    targetPath: "replacement.txt"
+  });
+
+  assert.equal(
+    sameByteFenceFileIdentity(inspected.stat, replacementInspected.stat),
+    false
+  );
 
   unlinkSync(path);
-  writeFileSync(path, "after\n");
+  renameSync(replacement, path);
 
   assertPathError(
     () => readByteFenceTarget(inspected),
