@@ -221,6 +221,8 @@ docs/dashboard.md                  local HTML dashboard workflow
 
 ## Roadmap
 
+- [Draft ProofPatch RFC](docs/rfc-proofpatch.md): deterministic preimage-to-candidate
+  mutation receipts. No implementation or compatibility claim yet.
 - OpenTelemetry-shaped trace adapter.
 - GitHub pull-request comment, status badge and required-check examples.
 - Policy comparator and shared fixture registry.
