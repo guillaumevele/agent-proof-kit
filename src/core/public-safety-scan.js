@@ -1,17 +1,27 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
 import { scanText } from "./text-scan.js";
 
-const skippedDirectories = new Set([".git", "node_modules", ".next", "dist", "coverage"]);
+const skippedDirectories = new Set([
+  ".git",
+  "node_modules",
+  ".next",
+  "dist",
+  "coverage",
+  "__pycache__"
+]);
 const skippedExtensions = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf", ".zip", ".gz", ".tgz"]);
 
 export function scanPublicSurface(rootPath, policy = {}, options = {}) {
   const files = listFiles(rootPath);
+  const includedPaths = normalizeIncludedPaths(options.includedPaths);
   const findings = [];
   const skippedFiles = [];
   let filesScanned = 0;
 
   for (const file of files) {
+    const rootRelativePath = relative(rootPath, file).split(sep).join("/");
+    if (includedPaths && !includedPaths.has(rootRelativePath)) continue;
     const rel = relative(options.rootDir ?? rootPath, file);
     const fileFindings = scanFileName(rel);
     findings.push(...fileFindings);
@@ -42,6 +52,14 @@ export function scanPublicSurface(rootPath, policy = {}, options = {}) {
     skippedFiles,
     findings
   };
+}
+
+function normalizeIncludedPaths(paths) {
+  if (paths === undefined) return null;
+  if (!Array.isArray(paths) || paths.some((path) => typeof path !== "string")) {
+    throw new TypeError("includedPaths must be an array of repository-relative paths.");
+  }
+  return new Set(paths.map((path) => path.split("\\").join("/")));
 }
 
 function listFiles(rootPath) {

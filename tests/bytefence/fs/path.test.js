@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   chmodSync,
+  constants,
   linkSync,
   mkdirSync,
   mkdtempSync,
@@ -187,7 +188,7 @@ test("refuses a target whose inode changes after inspection", () => {
   );
 });
 
-test("uses no-follow semantics when a final target becomes a symlink", (t) => {
+test("detects a final-component symlink swap with or without no-follow support", (t) => {
   const root = fixtureRoot();
   const outside = fixtureRoot();
   const path = join(root, "target.txt");
@@ -206,7 +207,9 @@ test("uses no-follow semantics when a final target becomes a symlink", (t) => {
 
   assertPathError(
     () => readByteFenceTarget(inspected),
-    "path.open_failed"
+    typeof constants.O_NOFOLLOW === "number"
+      ? "path.open_failed"
+      : "path.identity_changed"
   );
 });
 

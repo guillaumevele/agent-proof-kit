@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { diffAgentRuns } from "../../src/core/diff-agent-runs.js";
 import { evaluateAgentRun } from "../../src/core/evaluate-agent-run.js";
@@ -31,7 +32,8 @@ export function buildMachineArtifacts() {
   });
   const scan = scanPublicSurface(".", policy, {
     rootDir: ".",
-    displayRoot: "."
+    displayRoot: ".",
+    includedPaths: readTrackedPaths()
   });
   const bundle = createProofBundle({
     evaluation,
@@ -68,4 +70,17 @@ export function buildMachineArtifacts() {
 
 function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
+}
+
+function readTrackedPaths() {
+  const result = spawnSync("git", ["ls-files", "-z"], {
+    encoding: "utf8",
+    maxBuffer: 10 * 1024 * 1024
+  });
+  if (result.error || result.status !== 0) {
+    throw new Error(
+      "Generated proof artifacts require a Git checkout with a readable tracked-file index."
+    );
+  }
+  return result.stdout.split("\0").filter(Boolean);
 }
