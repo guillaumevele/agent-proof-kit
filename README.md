@@ -221,8 +221,9 @@ docs/dashboard.md                  local HTML dashboard workflow
 
 ## Roadmap
 
-- [Draft ProofPatch RFC](docs/rfc-proofpatch.md): deterministic preimage-to-candidate
-  mutation receipts. No implementation or compatibility claim yet.
+- [Approved ByteFence design](docs/rfc-bytefence.md): working-name design for
+  preimage-bound raw-byte mutation checks and mediated writes. No prevention
+  claim ships before the transactional path and platform matrix are tested.
 - OpenTelemetry-shaped trace adapter.
 - GitHub pull-request comment, status badge and required-check examples.
 - Policy comparator and shared fixture registry.
