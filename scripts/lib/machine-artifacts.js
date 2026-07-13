@@ -10,6 +10,7 @@ import { renderSarif } from "../../src/report/sarif-report.js";
 import { buildGateCoverageMatrix } from "./gate-coverage.js";
 
 export function buildMachineArtifacts() {
+  const packageMetadata = readJson("package.json");
   const policy = readJson("policies/default-policy.json");
   const baselineRun = readJson("examples/synthetic-agent-run.json");
   const regressionRun = readJson("examples/synthetic-agent-run-regression.json");
@@ -36,7 +37,7 @@ export function buildMachineArtifacts() {
     evaluation,
     scan,
     metadata: {
-      version: "0.4.0",
+      version: packageMetadata.version,
       generatedAt: "2026-06-18T00:00:00.000Z",
       command: "npm run verify",
       repository: "guillaumevele/agent-proof-kit",
