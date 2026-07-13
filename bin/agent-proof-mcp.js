@@ -1,11 +1,35 @@
 #!/usr/bin/env node
 
-import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import {
+  closeSync,
+  constants,
+  existsSync,
+  fstatSync,
+  fsyncSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  realpathSync,
+  statSync,
+  unlinkSync,
+  writeFileSync
+} from "node:fs";
 import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import { applyByteFenceTransaction } from "../src/core/bytefence-apply.js";
+import {
+  BYTEFENCE_MAX_INTENT_BYTES,
+  BYTEFENCE_MAX_POLICY_BYTES,
+  parseByteFenceIntent,
+  parseByteFencePolicy
+} from "../src/core/bytefence-contract.js";
+import { evaluateByteFence } from "../src/core/bytefence-evaluate.js";
+import { inspectByteFenceTarget, readByteFenceTarget } from "../src/core/bytefence-path.js";
+import { receiptDigest as digestByteFenceReceipt } from "../src/core/bytefence-receipt.js";
 import { diffAgentRuns } from "../src/core/diff-agent-runs.js";
 import { evaluateAgentRun } from "../src/core/evaluate-agent-run.js";
 import { compilePolicyDefinition, loadPolicyFile, readPolicyDefinition } from "../src/core/policy-loader.js";
@@ -92,6 +116,8 @@ Use this first when an assistant needs to understand what proof artifacts, sampl
         exists: existsSync(resolve(packageRoot, path))
       })),
       nextTools: [
+        "bytefence_check",
+        "bytefence_apply",
         "agent_proof_verify_run",
         "agent_proof_scan_surface",
         "agent_proof_compile_policy",
@@ -106,6 +132,122 @@ Use this first when an assistant needs to understand what proof artifacts, sampl
     };
 
     return response_format === ResponseFormat.JSON ? JSON.stringify(info, null, 2) : renderStatus(info);
+  })
+);
+
+server.registerTool(
+  "bytefence_check",
+  {
+    title: "Check a ByteFence Exact Replacement",
+    description: `Check proposed raw candidate bytes against a ByteFence exactReplace intent without modifying the workspace.
+
+Intent, policy, target and candidate are read as bytes under the configured workspace root. The response contains only decision metadata and digests; it never returns source bytes, prompts or tool arguments.`,
+    inputSchema: z.object({
+      intent_path: z.string().min(1).max(500)
+        .describe("ByteFence intent JSON path under the workspace root."),
+      policy_path: z.string().min(1).max(500)
+        .describe("ByteFence policy JSON path under the workspace root."),
+      candidate_path: z.string().min(1).max(500)
+        .describe("Raw candidate file path under the workspace root."),
+      workspace_id: z.string().min(1).max(1024)
+        .describe("Stable caller-defined workspace identifier. Only its digest enters a public receipt.")
+    }).strict(),
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false
+    }
+  },
+  async ({ intent_path, policy_path, candidate_path, workspace_id }) => toToolResult(() => {
+    const intentBytes = readByteFenceWorkspaceFile(
+      intent_path,
+      BYTEFENCE_MAX_INTENT_BYTES
+    ).bytes;
+    const policyBytes = readByteFenceWorkspaceFile(
+      policy_path,
+      BYTEFENCE_MAX_POLICY_BYTES
+    ).bytes;
+    const policy = parseByteFencePolicy(policyBytes);
+    const candidate = readByteFenceWorkspaceFile(
+      candidate_path,
+      policy.maxTargetBytes
+    ).bytes;
+    const intent = parseByteFenceIntent(intentBytes);
+    const target = inspectByteFenceTarget({
+      root: workspaceRoot,
+      targetPath: intent.targetPath
+    });
+    const preimage = readByteFenceTarget(target, {
+      maxBytes: policy.maxTargetBytes
+    }).bytes;
+    const evaluation = evaluateByteFence({
+      preimage,
+      candidate,
+      intentBytes,
+      policyBytes,
+      workspaceId: workspace_id,
+      observedAt: new Date().toISOString(),
+      receiptProfile: "public"
+    });
+
+    return JSON.stringify(summarizeByteFenceResult(evaluation, {
+      receipt: evaluation.statement ?? null,
+      receiptDigest: evaluation.receiptBytes
+        ? digestByteFenceReceipt(evaluation.receiptBytes)
+        : null
+    }), null, 2);
+  })
+);
+
+server.registerTool(
+  "bytefence_apply",
+  {
+    title: "Apply a ByteFence Exact Replacement",
+    description: `Apply one ByteFence exactReplace transaction and create one immutable public receipt.
+
+This tool owns the mediated write. It calls the transaction engine exactly once and never retries, including after an unknown or committed-unreceipted state. Intent, policy, target and receipt paths remain confined to the configured workspace root. The response contains no source bytes, prompts or tool arguments.`,
+    inputSchema: z.object({
+      intent_path: z.string().min(1).max(500)
+        .describe("ByteFence intent JSON path under the workspace root."),
+      policy_path: z.string().min(1).max(500)
+        .describe("ByteFence policy JSON path under the workspace root."),
+      workspace_id: z.string().min(1).max(1024)
+        .describe("Stable caller-defined workspace identifier. Only its digest enters the public receipt."),
+      receipt_path: z.string().min(1).max(500)
+        .describe("Fresh receipt path under the workspace root. Its parent directory must already exist.")
+    }).strict(),
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: false
+    }
+  },
+  async ({ intent_path, policy_path, workspace_id, receipt_path }) => toToolResult(() => {
+    const intentBytes = readByteFenceWorkspaceFile(
+      intent_path,
+      BYTEFENCE_MAX_INTENT_BYTES
+    ).bytes;
+    const policyBytes = readByteFenceWorkspaceFile(
+      policy_path,
+      BYTEFENCE_MAX_POLICY_BYTES
+    ).bytes;
+    const result = applyByteFenceTransaction({
+      root: workspaceRoot,
+      intentBytes,
+      policyBytes,
+      workspaceId: workspace_id,
+      observedAt: new Date().toISOString(),
+      receiptProfile: "public",
+      receiptPath: receipt_path
+    });
+
+    return JSON.stringify(summarizeByteFenceResult(result, {
+      receiptDigest: result.receiptDigest ?? null,
+      receiptPersisted: result.receiptPersisted === true,
+      retryAutomatically: false
+    }), null, 2);
   })
 );
 
@@ -203,7 +345,7 @@ Use this when a team has a YAML policy DSL file or wants an assistant to inspect
         .describe("Policy YAML or JSON path under the workspace root. Omit to use the bundled YAML policy example."),
       write_path: z.string().min(1).max(500)
         .optional()
-        .describe("Optional compiled policy JSON path under the workspace root. Parent directories are created."),
+        .describe("Optional fresh compiled policy JSON path under the workspace root. Parent directories are created; existing paths are refused."),
       response_format: z.enum([ResponseFormat.JSON, ResponseFormat.MARKDOWN])
         .default(ResponseFormat.MARKDOWN)
         .describe("Output format.")
@@ -221,8 +363,7 @@ Use this when a team has a YAML policy DSL file or wants an assistant to inspect
     let writtenTo = null;
     if (write_path) {
       const out = resolveWorkspaceWritePath(write_path, "write_path");
-      mkdirSync(dirname(out.path), { recursive: true });
-      writeFileSync(out.path, `${JSON.stringify(policy, null, 2)}\n`);
+      writeFreshWorkspaceArtifact(out, `${JSON.stringify(policy, null, 2)}\n`);
       writtenTo = out.displayPath;
     }
 
@@ -262,7 +403,7 @@ Use this when onboarding a repository that has JSONL events but not yet an Agent
         .describe("Sensitive terms to replace with [redacted-term-N] placeholders in string values."),
       write_path: z.string().min(1).max(500)
         .optional()
-        .describe("Optional output JSON path under the workspace root. Parent directories are created."),
+        .describe("Optional fresh output JSON path under the workspace root. Parent directories are created; existing paths are refused."),
       response_format: z.enum([ResponseFormat.JSON, ResponseFormat.MARKDOWN])
         .default(ResponseFormat.MARKDOWN)
         .describe("Output format.")
@@ -283,8 +424,7 @@ Use this when onboarding a repository that has JSONL events but not yet an Agent
     let writtenTo = null;
     if (write_path) {
       const out = resolveWorkspaceWritePath(write_path, "write_path");
-      mkdirSync(dirname(out.path), { recursive: true });
-      writeFileSync(out.path, `${JSON.stringify(exported.run, null, 2)}\n`);
+      writeFreshWorkspaceArtifact(out, `${JSON.stringify(exported.run, null, 2)}\n`);
       writtenTo = out.displayPath;
     }
 
@@ -366,7 +506,7 @@ Use this when an assistant needs a single JSON object that combines run evaluati
         .describe("Directory under the workspace root to scan."),
       write_path: z.string().min(1).max(500)
         .optional()
-        .describe("Optional output JSON path under the workspace root. Parent directories are created."),
+        .describe("Optional fresh output JSON path under the workspace root. Parent directories are created; existing paths are refused."),
       response_format: z.enum([ResponseFormat.JSON, ResponseFormat.MARKDOWN])
         .default(ResponseFormat.MARKDOWN)
         .describe("Output format.")
@@ -405,8 +545,7 @@ Use this when an assistant needs a single JSON object that combines run evaluati
     let writtenTo = null;
     if (write_path) {
       const out = resolveWorkspaceWritePath(write_path, "write_path");
-      mkdirSync(dirname(out.path), { recursive: true });
-      writeFileSync(out.path, `${JSON.stringify(bundle, null, 2)}\n`);
+      writeFreshWorkspaceArtifact(out, `${JSON.stringify(bundle, null, 2)}\n`);
       writtenTo = out.displayPath;
     }
 
@@ -444,7 +583,7 @@ Use this after creating or receiving a proof bundle. Provide private_key only wh
         .describe("Optional RSA private key PEM path under the workspace root for cryptographic signing."),
       write_path: z.string().min(1).max(500)
         .optional()
-        .describe("Optional attestation JSON path under the workspace root. Parent directories are created."),
+        .describe("Optional fresh attestation JSON path under the workspace root. Parent directories are created; existing paths are refused."),
       response_format: z.enum([ResponseFormat.JSON, ResponseFormat.MARKDOWN])
         .default(ResponseFormat.MARKDOWN)
         .describe("Output format.")
@@ -465,8 +604,7 @@ Use this after creating or receiving a proof bundle. Provide private_key only wh
     let writtenTo = null;
     if (write_path) {
       const out = resolveWorkspaceWritePath(write_path, "write_path");
-      mkdirSync(dirname(out.path), { recursive: true });
-      writeFileSync(out.path, `${JSON.stringify(attestation, null, 2)}\n`);
+      writeFreshWorkspaceArtifact(out, `${JSON.stringify(attestation, null, 2)}\n`);
       writtenTo = out.displayPath;
     }
 
@@ -560,7 +698,7 @@ Use this when a team wants a reviewable proof artifact for pull requests, releas
         .describe("Optional attestation JSON path under the workspace root. Omit to use the bundled sample attestation."),
       write_path: z.string().min(1).max(500)
         .optional()
-        .describe("Optional dashboard HTML path under the workspace root. Parent directories are created."),
+        .describe("Optional fresh dashboard HTML path under the workspace root. Parent directories are created; existing paths are refused."),
       response_format: z.enum([ResponseFormat.JSON, ResponseFormat.MARKDOWN, "html"])
         .default(ResponseFormat.MARKDOWN)
         .describe("Output format. Use html only when the caller explicitly needs raw HTML in the response.")
@@ -584,8 +722,7 @@ Use this when a team wants a reviewable proof artifact for pull requests, releas
     let writtenTo = null;
     if (write_path) {
       const out = resolveWorkspaceWritePath(write_path, "write_path");
-      mkdirSync(dirname(out.path), { recursive: true });
-      writeFileSync(out.path, html);
+      writeFreshWorkspaceArtifact(out, html);
       writtenTo = out.displayPath;
     }
 
@@ -670,6 +807,38 @@ function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
 }
 
+function readByteFenceWorkspaceFile(relativePath, maxBytes) {
+  const target = inspectByteFenceTarget({
+    root: workspaceRoot,
+    targetPath: relativePath
+  });
+  return readByteFenceTarget(target, { maxBytes });
+}
+
+function summarizeByteFenceResult(result, extra = {}) {
+  return {
+    status: result?.status ?? "invalid",
+    allowed: result?.allowed === true,
+    exitCode: Number.isInteger(result?.exitCode) ? result.exitCode : 2,
+    declaredGuaranteeLevel: result?.declaredGuaranteeLevel ?? null,
+    effectiveGuaranteeLevel: result?.effectiveGuaranteeLevel ?? "OUT_OF_SCOPE",
+    mediationEnvironmentTrusted: result?.mediationEnvironmentTrusted === true,
+    publicProfileConformant: result?.publicProfileConformant ?? null,
+    phase: result?.phase ?? "preflight",
+    operationId: result?.operationId ?? null,
+    preimageDigest: result?.preimageDigest ?? null,
+    candidateDigest: result?.candidateDigest ?? null,
+    manifestDigest: result?.manifestDigest ?? null,
+    checks: result?.checks ?? null,
+    findings: (result?.findings ?? []).map((finding) => ({
+      code: finding.id,
+      severity: finding.severity,
+      location: finding.location
+    })),
+    ...extra
+  };
+}
+
 function toToolResult(fn) {
   try {
     return {
@@ -725,8 +894,87 @@ function resolveWorkspaceWritePath(value, label) {
   assertInsideWorkspace(dirname(path), label);
   return {
     path,
-    displayPath: relative(workspaceRoot, path) || "."
+    displayPath: relative(workspaceRoot, path) || ".",
+    label
   };
+}
+
+function writeFreshWorkspaceArtifact(output, bytes) {
+  const parent = dirname(output.path);
+  mkdirSync(parent, { recursive: true });
+  assertInsideWorkspace(parent, output.label);
+
+  let descriptor;
+  let createdStat;
+  try {
+    const noFollow = typeof constants.O_NOFOLLOW === "number"
+      ? constants.O_NOFOLLOW
+      : 0;
+    descriptor = openSync(
+      output.path,
+      constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | noFollow,
+      0o600
+    );
+    createdStat = fstatSync(descriptor, { bigint: true });
+    if (!createdStat.isFile() || createdStat.nlink !== 1n) {
+      throw new Error("The output is not a uniquely linked regular file.");
+    }
+
+    writeFileSync(descriptor, bytes);
+    fsyncSync(descriptor);
+    createdStat = fstatSync(descriptor, { bigint: true });
+    if (!createdStat.isFile() || createdStat.nlink !== 1n) {
+      throw new Error("The output identity changed while it was being written.");
+    }
+    closeSync(descriptor);
+    descriptor = undefined;
+
+    const pathStat = lstatSync(output.path, { bigint: true });
+    if (
+      pathStat.isSymbolicLink() ||
+      !pathStat.isFile() ||
+      pathStat.nlink !== 1n ||
+      !sameFileIdentity(createdStat, pathStat)
+    ) {
+      throw new Error("The output identity changed while it was being written.");
+    }
+    assertInsideWorkspace(output.path, output.label);
+  } catch {
+    if (descriptor !== undefined) {
+      try {
+        closeSync(descriptor);
+      } catch {
+        // The original closed failure remains authoritative.
+      }
+    }
+    removeOwnedWorkspaceArtifact(output.path, createdStat);
+    throw new Error(
+      `${output.label} must name a fresh regular file under the workspace root.`
+    );
+  }
+}
+
+function removeOwnedWorkspaceArtifact(path, createdStat) {
+  if (!createdStat) return;
+  try {
+    const current = lstatSync(path, { bigint: true });
+    if (!current.isSymbolicLink() && sameFileIdentity(createdStat, current)) {
+      unlinkSync(path);
+    }
+  } catch {
+    // Cleanup is identity-checked and best effort; the operation still fails.
+  }
+}
+
+function sameFileIdentity(left, right) {
+  const leftDev = String(left.dev);
+  const leftIno = String(left.ino);
+  const rightDev = String(right.dev);
+  const rightIno = String(right.ino);
+  if (leftDev === "0" && leftIno === "0" && rightDev === "0" && rightIno === "0") {
+    return false;
+  }
+  return leftDev === rightDev && leftIno === rightIno;
 }
 
 function assertInsideWorkspace(path, label) {

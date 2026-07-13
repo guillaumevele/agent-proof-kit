@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { validateJsonSchema } from "../../src/core/json-schema-validator.js";
+import { parseByteFencePolicy } from "../../src/core/bytefence-contract.js";
 import { compilePolicyDefinition, loadPolicyFile, readPolicyDefinition } from "../../src/core/policy-loader.js";
 import { validateAgentRun, validatePolicy } from "../../src/core/validate-agent-run.js";
 
@@ -9,6 +10,9 @@ const safeRun = JSON.parse(readFileSync("examples/synthetic-agent-run.json", "ut
 const policy = JSON.parse(readFileSync("policies/default-policy.json", "utf8"));
 const agentRunSchema = JSON.parse(readFileSync("schemas/agent-run.schema.json", "utf8"));
 const policySchema = JSON.parse(readFileSync("schemas/policy.schema.json", "utf8"));
+const byteFencePolicySchema = JSON.parse(
+  readFileSync("schemas/bytefence-policy-v0.1.schema.json", "utf8")
+);
 
 test("validates the public run fixture", () => {
   const result = validateAgentRun(safeRun);
@@ -29,7 +33,16 @@ test("validates every bundled policy pack", () => {
     .sort();
 
   for (const path of policyPaths) {
-    const result = validatePolicy(JSON.parse(readFileSync(path, "utf8")));
+    const bytes = readFileSync(path);
+    const parsed = JSON.parse(bytes.toString("utf8"));
+    if (parsed.$schema === byteFencePolicySchema.$id) {
+      assert.deepEqual(validateJsonSchema(parsed, byteFencePolicySchema), [], path);
+      assert.doesNotThrow(() => parseByteFencePolicy(bytes), path);
+      continue;
+    }
+
+    assert.equal(parsed.$schema, undefined, `Unsupported policy schema in ${path}`);
+    const result = validatePolicy(parsed);
     assert.equal(result.status, "pass", path);
     assert.equal(result.findings.length, 0, path);
   }

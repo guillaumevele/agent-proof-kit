@@ -22,16 +22,70 @@ jobs:
         env:
           HAS_TOKEN: ${{ secrets.NPM_TOKEN != '' }}
         run: echo "has_token=$HAS_TOKEN" >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: adapters/vibe/requirements-vibe.txt
       - run: npm ci
-      - name: Verify (full proof gate)
+      - name: Bind release tag, commit and package bytes
+        id: release
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          package_name="$(node -p "require('./package.json').name")"
+          package_version="$(node -p "require('./package.json').version")"
+          expected_tag="v${package_version}"
+          test "$RELEASE_TAG" = "$expected_tag"
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+
+          pack_dir="$RUNNER_TEMP/agent-proof-pack"
+          mkdir -p "$pack_dir"
+          npm pack --json --pack-destination "$pack_dir" > "$RUNNER_TEMP/agent-proof-pack.json"
+          pack_file="$(node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync(process.argv[1],'utf8'))[0]; process.stdout.write(p.filename)" "$RUNNER_TEMP/agent-proof-pack.json")"
+          pack_shasum="$(shasum -a 1 "$pack_dir/$pack_file" | awk '{print $1}')"
+
+          already_published=false
+          if npm view "${package_name}@${package_version}" version >/dev/null 2>&1; then
+            already_published=true
+          fi
+          echo "package_name=$package_name" >> "$GITHUB_OUTPUT"
+          echo "package_version=$package_version" >> "$GITHUB_OUTPUT"
+          echo "pack_shasum=$pack_shasum" >> "$GITHUB_OUTPUT"
+          echo "already_published=$already_published" >> "$GITHUB_OUTPUT"
+      - name: Verify Node proof gate
         run: npm run verify
+      - name: Install pinned Mistral Vibe
+        run: python -m pip install --disable-pip-version-check -r adapters/vibe/requirements-vibe.txt
+      - name: Verify Mistral Vibe adapter
+        run: |
+          python -m unittest discover -s tests/bytefence/vibe -p 'test_*.py'
+          python adapters/vibe/check_compatibility.py
       - name: Publish (with provenance)
-        if: steps.token.outputs.has_token == 'true'
+        if: steps.token.outputs.has_token == 'true' && steps.release.outputs.already_published != 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}   # least privilege: token only on this step
-        run: npm publish --provenance --access public
+        run: npm publish --provenance --access public --tag latest
+      - name: Assert release is available on npm
+        run: |
+          for attempt in 1 2 3 4 5; do
+            actual_version="$(npm view "${{ steps.release.outputs.package_name }}@${{ steps.release.outputs.package_version }}" version 2>/dev/null || true)"
+            actual_git_head="$(npm view "${{ steps.release.outputs.package_name }}@${{ steps.release.outputs.package_version }}" gitHead 2>/dev/null || true)"
+            actual_shasum="$(npm view "${{ steps.release.outputs.package_name }}@${{ steps.release.outputs.package_version }}" dist.shasum 2>/dev/null || true)"
+            actual_latest="$(npm view "${{ steps.release.outputs.package_name }}" dist-tags.latest 2>/dev/null || true)"
+            if [ "$actual_version" = "${{ steps.release.outputs.package_version }}" ] && \
+               [ "$actual_git_head" = "${{ github.sha }}" ] && \
+               [ "$actual_shasum" = "${{ steps.release.outputs.pack_shasum }}" ] && \
+               [ "$actual_latest" = "${{ steps.release.outputs.package_version }}" ]; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "The npm release does not match the release tag, commit and packed bytes." >&2
+          exit 1

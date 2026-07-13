@@ -1,0 +1,4 @@
+label_nfd = "café"
+mode = "before"
+label_nfc = "café"
+marker = "𐐀"

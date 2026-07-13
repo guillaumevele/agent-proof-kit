@@ -1,0 +1,2 @@
+export const mode = "safe";
+export const retries = 3;

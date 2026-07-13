@@ -1,0 +1,15 @@
+{
+  "$schema": "https://raw.githubusercontent.com/guillaumevele/agent-proof-kit/v0.5.0/schemas/bytefence-policy-v0.1.schema.json",
+  "id": "bytefence-default",
+  "maxTargetBytes": 10485760,
+  "maxOldBytes": 65536,
+  "maxNewBytes": 65536,
+  "maxDeletionRatio": 0.25,
+  "denyFullTargetReplacement": true,
+  "allowSymlinks": false,
+  "allowHardlinks": false,
+  "requireUtf8": true,
+  "allowNul": false,
+  "preserveUtf8Bom": true,
+  "preservePosixMode": true
+}

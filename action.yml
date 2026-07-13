@@ -22,10 +22,25 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Install locked runtime dependencies
+      shell: bash
+      env:
+        AGENT_PROOF_ACTION_PATH: ${{ github.action_path }}
+      run: npm ci --omit=dev --ignore-scripts --no-audit --no-fund --prefix "$AGENT_PROOF_ACTION_PATH"
     - name: Generate proof report
       shell: bash
-      run: node "${{ github.action_path }}/bin/agent-proof.js" verify --input "${{ inputs.input }}" --policy "${{ inputs.policy }}" --format markdown --out "${{ inputs.report }}"
+      env:
+        AGENT_PROOF_ACTION_PATH: ${{ github.action_path }}
+        AGENT_PROOF_INPUT: ${{ inputs.input }}
+        AGENT_PROOF_POLICY: ${{ inputs.policy }}
+        AGENT_PROOF_REPORT: ${{ inputs.report }}
+      run: node "$AGENT_PROOF_ACTION_PATH/bin/agent-proof.js" verify --input "$AGENT_PROOF_INPUT" --policy "$AGENT_PROOF_POLICY" --format markdown --out "$AGENT_PROOF_REPORT"
     - name: Generate SARIF report
       shell: bash
       if: always()
-      run: node "${{ github.action_path }}/bin/agent-proof.js" verify --input "${{ inputs.input }}" --policy "${{ inputs.policy }}" --format sarif --out "${{ inputs.sarif }}"
+      env:
+        AGENT_PROOF_ACTION_PATH: ${{ github.action_path }}
+        AGENT_PROOF_INPUT: ${{ inputs.input }}
+        AGENT_PROOF_POLICY: ${{ inputs.policy }}
+        AGENT_PROOF_SARIF: ${{ inputs.sarif }}
+      run: node "$AGENT_PROOF_ACTION_PATH/bin/agent-proof.js" verify --input "$AGENT_PROOF_INPUT" --policy "$AGENT_PROOF_POLICY" --format sarif --out "$AGENT_PROOF_SARIF"

@@ -1,0 +1,502 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/guillaumevele/agent-proof-kit/v0.5.0/schemas/bytefence-statement-v0.1.schema.json",
+  "title": "ByteFence in-toto Statement v0.1",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["_type", "subject", "predicateType", "predicate"],
+  "properties": {
+    "_type": {
+      "const": "https://in-toto.io/Statement/v1"
+    },
+    "subject": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["name", "digest", "mediaType"],
+        "properties": {
+          "name": {
+            "const": "bytefence-target"
+          },
+          "digest": {
+            "$ref": "#/$defs/inTotoDigest"
+          },
+          "mediaType": {
+            "const": "text/plain"
+          }
+        }
+      }
+    },
+    "predicateType": {
+      "const": "https://raw.githubusercontent.com/guillaumevele/agent-proof-kit/v0.5.0/schemas/bytefence-statement-v0.1.schema.json"
+    },
+    "predicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "observedAt",
+        "phase",
+        "receiptProfile",
+        "operation",
+        "contractDigest",
+        "targetPathDigest",
+        "before",
+        "workspace",
+        "intent",
+        "change",
+        "policy",
+        "decision"
+      ],
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "pattern": "^bf-[0-9a-f]{32}$"
+        },
+        "observedAt": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$"
+        },
+        "phase": {
+          "enum": ["preflight", "postApply"]
+        },
+        "receiptProfile": {
+          "enum": ["public", "local"]
+        },
+        "operation": {
+          "const": "exactReplace"
+        },
+        "contractDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "targetPathDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "targetPath": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "before": {
+          "$ref": "#/$defs/material"
+        },
+        "workspace": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["idDigest"],
+          "properties": {
+            "idDigest": {
+              "$ref": "#/$defs/digest"
+            }
+          }
+        },
+        "intent": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["digest", "expectedPathDigest", "expectedOccurrences"],
+          "properties": {
+            "digest": {
+              "$ref": "#/$defs/digest"
+            },
+            "expectedPathDigest": {
+              "$ref": "#/$defs/digest"
+            },
+            "expectedOccurrences": {
+              "const": 1
+            }
+          }
+        },
+        "change": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "patchManifestDigest",
+            "beforeBytes",
+            "afterBytes",
+            "beforeLines",
+            "afterLines",
+            "addedLines",
+            "deletedLines",
+            "hunks"
+          ],
+          "properties": {
+            "patchManifestDigest": {
+              "$ref": "#/$defs/digest"
+            },
+            "beforeBytes": {
+              "$ref": "#/$defs/nonNegativeSafeInteger"
+            },
+            "afterBytes": {
+              "$ref": "#/$defs/nonNegativeSafeInteger"
+            },
+            "beforeLines": {
+              "$ref": "#/$defs/nonNegativeSafeInteger"
+            },
+            "afterLines": {
+              "$ref": "#/$defs/nonNegativeSafeInteger"
+            },
+            "addedLines": {
+              "$ref": "#/$defs/nonNegativeSafeInteger"
+            },
+            "deletedLines": {
+              "$ref": "#/$defs/nonNegativeSafeInteger"
+            },
+            "hunks": {
+              "const": 1
+            }
+          }
+        },
+        "policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "digest"],
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "digest": {
+              "$ref": "#/$defs/digest"
+            }
+          }
+        },
+        "decision": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "declaredGuaranteeLevel", "checks", "approval"],
+          "properties": {
+            "status": {
+              "enum": ["allow", "deny"]
+            },
+            "declaredGuaranteeLevel": {
+              "enum": ["CORE_PROVEN", "MEDIATED_PROVEN", "POSTHOC_DETECTED", "OUT_OF_SCOPE"]
+            },
+            "checks": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "prefixItems": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["id", "status"],
+                  "properties": {
+                    "id": {
+                      "const": "preimage.digestMatches"
+                    },
+                    "status": {
+                      "enum": ["pass", "fail"]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["id", "status"],
+                  "properties": {
+                    "id": {
+                      "const": "scope.exact"
+                    },
+                    "status": {
+                      "enum": ["pass", "fail"]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["id", "status"],
+                  "properties": {
+                    "id": {
+                      "const": "change.withinLimits"
+                    },
+                    "status": {
+                      "enum": ["pass", "fail"]
+                    }
+                  }
+                }
+              ],
+              "items": false
+            },
+            "approval": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["status"],
+              "properties": {
+                "status": {
+                  "const": "notApplicableInV0.1"
+                }
+              }
+            }
+          }
+        },
+        "correlation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "repository": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "commit": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "traceId": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "spanId": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{16}$"
+            },
+            "toolCallId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "toolName": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          }
+        },
+        "preflightStatementDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "observed": {
+          "$ref": "#/$defs/material"
+        },
+        "mediation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["protocol", "cooperatingWriterLockActive", "targetMatchedCandidate"],
+          "properties": {
+            "protocol": {
+              "const": "ByteFenceCooperativeLock/v0.1"
+            },
+            "cooperatingWriterLockActive": {
+              "const": true
+            },
+            "targetMatchedCandidate": {
+              "const": true
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "type": "object",
+            "required": ["phase"],
+            "properties": {
+              "phase": {
+                "const": "preflight"
+              }
+            }
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "decision": {
+                "type": "object",
+                "properties": {
+                  "declaredGuaranteeLevel": {
+                    "const": "CORE_PROVEN"
+                  }
+                }
+              }
+            },
+            "not": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "required": ["preflightStatementDigest"],
+                  "properties": {
+                    "preflightStatementDigest": true
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": ["observed"],
+                  "properties": {
+                    "observed": true
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": ["mediation"],
+                  "properties": {
+                    "mediation": true
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "type": "object",
+            "required": ["phase"],
+            "properties": {
+              "phase": {
+                "const": "postApply"
+              }
+            }
+          },
+          "then": {
+            "type": "object",
+            "required": ["preflightStatementDigest", "observed", "mediation"],
+            "properties": {
+              "preflightStatementDigest": true,
+              "observed": true,
+              "mediation": true,
+              "decision": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "const": "allow"
+                  },
+                  "declaredGuaranteeLevel": {
+                    "const": "MEDIATED_PROVEN"
+                  },
+                  "checks": {
+                    "type": "array",
+                    "minItems": 3,
+                    "maxItems": 3,
+                    "items": false,
+                    "prefixItems": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "status": {
+                            "const": "pass"
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "status": {
+                            "const": "pass"
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "status": {
+                            "const": "pass"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "type": "object",
+            "required": ["receiptProfile"],
+            "properties": {
+              "receiptProfile": {
+                "const": "public"
+              }
+            }
+          },
+          "then": {
+            "type": "object",
+            "not": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "required": ["targetPath"],
+                  "properties": {
+                    "targetPath": true
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": ["correlation"],
+                  "properties": {
+                    "correlation": true
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "type": "object",
+            "required": ["receiptProfile"],
+            "properties": {
+              "receiptProfile": {
+                "const": "local"
+              }
+            }
+          },
+          "then": {
+            "type": "object",
+            "required": ["targetPath"],
+            "properties": {
+              "targetPath": true
+            }
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "inTotoDigest": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["sha256"],
+      "properties": {
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "digest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256"],
+      "properties": {
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "material": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["digest", "mediaType"],
+      "properties": {
+        "digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "mediaType": {
+          "const": "text/plain"
+        }
+      }
+    },
+    "nonNegativeSafeInteger": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    }
+  }
+}

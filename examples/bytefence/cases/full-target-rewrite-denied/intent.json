@@ -1,0 +1,9 @@
+{
+  "$schema": "https://raw.githubusercontent.com/guillaumevele/agent-proof-kit/v0.5.0/schemas/bytefence-intent-v0.1.schema.json",
+  "operation": "exactReplace",
+  "targetPath": "workspace/policy.conf",
+  "encoding": "utf-8",
+  "oldText": "policy=strict\nowner=human\nnetwork=denied\naudit=required\nretention=30d\nregion=eu\nstatus=active\n",
+  "newText": "agent_claim=approved\npolicy=permissive\nowner=agent\nnetwork=allowed\naudit=optional\nretention=none\nregion=global\nstatus=active\n",
+  "expectedOccurrences": 1
+}
