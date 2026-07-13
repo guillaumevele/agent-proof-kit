@@ -1,0 +1,35 @@
+# Protected example profile for mistral-vibe==2.19.1.
+# Replace workspace_id before use. Keep the explicit allowlist narrow.
+enable_experimental_hooks = true
+tool_paths = []
+mcp_servers = []
+enable_connectors = false
+connectors = []
+enable_config_orchestrator = false
+agent_paths = []
+default_agent = "default"
+enabled_agents = ["default"]
+disabled_agents = []
+installed_agents = []
+disabled_tools = []
+enabled_tools = [
+  "bytefence_apply",
+  "read_file",
+  "grep",
+  "web_fetch",
+  "web_search",
+  "todo",
+  "ask_user_question",
+  "skill",
+  "exit_plan_mode",
+]
+
+[tools.bytefence_apply]
+permission = "ask"
+broker_command = ["agent-proof", "bytefence-apply"]
+root = "."
+policy_path = ".vibe/bytefence-policy.json"
+workspace_id = "replace-with-stable-project-id"
+receipt_directory = ".vibe/bytefence-receipts"
+receipt_profile = "public"
+timeout_seconds = 60.0

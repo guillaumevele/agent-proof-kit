@@ -1,0 +1,17 @@
+[[hooks]]
+name = "bytefence-deny-unmediated-writes"
+type = "before_tool"
+match = "*"
+strict = true
+timeout = 5.0
+description = "Deny declared write side doors before their tool body runs"
+command = "python3 .vibe/hooks/bytefence_guard.py --phase before --deny-pattern edit --deny-pattern write_file --deny-pattern bash --deny-pattern task"
+
+[[hooks]]
+name = "bytefence-audit-broker-result"
+type = "after_tool"
+match = "bytefence_apply"
+strict = false
+timeout = 5.0
+description = "Record a non-sensitive broker completion event in the Vibe session log"
+command = "python3 .vibe/hooks/bytefence_guard.py --phase after"

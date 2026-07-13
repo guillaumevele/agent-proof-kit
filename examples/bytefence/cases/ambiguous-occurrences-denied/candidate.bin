@@ -1,0 +1,4 @@
+service=alpha
+role=writer
+service=beta
+role=reader

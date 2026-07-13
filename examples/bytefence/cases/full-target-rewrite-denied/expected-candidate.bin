@@ -1,0 +1,8 @@
+agent_claim=approved
+policy=permissive
+owner=agent
+network=allowed
+audit=optional
+retention=none
+region=global
+status=active

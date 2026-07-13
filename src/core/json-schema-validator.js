@@ -1,3 +1,5 @@
+import { isDeepStrictEqual } from "node:util";
+
 export function validateJsonSchema(value, schema) {
   const issues = [];
   validateNode(value, schema, "$", schema, issues);
@@ -5,9 +7,49 @@ export function validateJsonSchema(value, schema) {
 }
 
 function validateNode(value, schema, location, rootSchema, issues) {
-  if (!schema) return;
+  if (schema === true || schema === undefined || schema === null) return;
+  if (schema === false) {
+    issues.push({ location, message: "Value is denied by the schema." });
+    return;
+  }
   if (schema.$ref) {
     validateNode(value, resolveRef(schema.$ref, rootSchema), location, rootSchema, issues);
+    return;
+  }
+
+  for (const childSchema of schema.allOf ?? []) {
+    validateNode(value, childSchema, location, rootSchema, issues);
+  }
+
+  if (schema.anyOf) {
+    const matched = schema.anyOf.some((childSchema) =>
+      schemaMatches(value, childSchema, location, rootSchema)
+    );
+    if (!matched) issues.push({ location, message: "Expected at least one anyOf branch to match." });
+  }
+
+  if (schema.oneOf) {
+    const matches = schema.oneOf.filter((childSchema) =>
+      schemaMatches(value, childSchema, location, rootSchema)
+    ).length;
+    if (matches !== 1) {
+      issues.push({ location, message: `Expected exactly one oneOf branch to match; received ${matches}.` });
+    }
+  }
+
+  if (schema.not && schemaMatches(value, schema.not, location, rootSchema)) {
+    issues.push({ location, message: "Value matches a denied schema branch." });
+  }
+
+  if (schema.if) {
+    const branch = schemaMatches(value, schema.if, location, rootSchema)
+      ? schema.then
+      : schema.else;
+    if (branch !== undefined) validateNode(value, branch, location, rootSchema, issues);
+  }
+
+  if (Object.hasOwn(schema, "const") && !constantMatches(value, schema.const)) {
+    issues.push({ location, message: `Expected constant value: ${JSON.stringify(schema.const)}.` });
     return;
   }
 
@@ -25,6 +67,12 @@ function validateNode(value, schema, location, rootSchema, issues) {
     if (schema.minLength !== undefined && value.length < schema.minLength) {
       issues.push({ location, message: `Expected string length >= ${schema.minLength}.` });
     }
+    if (schema.maxLength !== undefined && value.length > schema.maxLength) {
+      issues.push({ location, message: `Expected string length <= ${schema.maxLength}.` });
+    }
+    if (schema.pattern !== undefined && !new RegExp(schema.pattern, "u").test(value)) {
+      issues.push({ location, message: `Expected string to match ${schema.pattern}.` });
+    }
     return;
   }
 
@@ -39,7 +87,23 @@ function validateNode(value, schema, location, rootSchema, issues) {
   }
 
   if (schema.type === "array") {
-    value.forEach((item, index) => validateNode(item, schema.items, `${location}[${index}]`, rootSchema, issues));
+    if (schema.minItems !== undefined && value.length < schema.minItems) {
+      issues.push({ location, message: `Expected at least ${schema.minItems} items.` });
+    }
+    if (schema.maxItems !== undefined && value.length > schema.maxItems) {
+      issues.push({ location, message: `Expected at most ${schema.maxItems} items.` });
+    }
+    const prefixItems = schema.prefixItems ?? [];
+    prefixItems.forEach((itemSchema, index) => {
+      if (index < value.length) {
+        validateNode(value[index], itemSchema, `${location}[${index}]`, rootSchema, issues);
+      }
+    });
+    if (schema.items !== undefined) {
+      for (let index = prefixItems.length; index < value.length; index += 1) {
+        validateNode(value[index], schema.items, `${location}[${index}]`, rootSchema, issues);
+      }
+    }
     return;
   }
 
@@ -56,6 +120,14 @@ function validateNode(value, schema, location, rootSchema, issues) {
       }
     }
 
+    if (schema.additionalProperties === false) {
+      for (const key of Object.keys(value)) {
+        if (!Object.hasOwn(schema.properties ?? {}, key)) {
+          issues.push({ location: `${location}.${key}`, message: "Unknown property." });
+        }
+      }
+    }
+
     if (schema.additionalProperties && typeof schema.additionalProperties === "object") {
       for (const [key, childValue] of Object.entries(value)) {
         if (!Object.hasOwn(schema.properties ?? {}, key)) {
@@ -64,6 +136,16 @@ function validateNode(value, schema, location, rootSchema, issues) {
       }
     }
   }
+}
+
+function schemaMatches(value, schema, location, rootSchema) {
+  const branchIssues = [];
+  validateNode(value, schema, location, rootSchema, branchIssues);
+  return branchIssues.length === 0;
+}
+
+function constantMatches(value, expected) {
+  return isDeepStrictEqual(value, expected);
 }
 
 function matchesType(value, type) {

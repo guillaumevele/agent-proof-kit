@@ -1,0 +1,4 @@
+const alpha = 1;
+const target = "before";
+const minority = "lf-only";
+const omega = 4;

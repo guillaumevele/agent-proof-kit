@@ -2,7 +2,15 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import {
+  linkSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  statSync,
+  symlinkSync,
+  writeFileSync
+} from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -24,7 +32,9 @@ test("MCP server exposes practical proof workflow tools", async () => {
       "agent_proof_sign_bundle",
       "agent_proof_status",
       "agent_proof_verify_bundle_signature",
-      "agent_proof_verify_run"
+      "agent_proof_verify_run",
+      "bytefence_apply",
+      "bytefence_check"
     ]);
   } finally {
     await client.close();
@@ -212,6 +222,78 @@ test("MCP server signs, verifies and renders proof artifacts", async () => {
     assert.equal(rendered.writtenTo, "artifacts/proof-dashboard.html");
     assert.ok(rendered.bytes > 1000);
     assert.match(readFileSync(join(workspace, "artifacts", "proof-dashboard.html"), "utf8"), /Agent Proof Dashboard/);
+  } finally {
+    await client.close();
+  }
+});
+
+test("generic MCP writers refuse every existing output instead of truncating it", async () => {
+  const workspace = mkdtempSync(join(tmpdir(), "agent-proof-mcp-fresh-output-"));
+  mkdirSync(join(workspace, "outputs"));
+  writeSyntheticJsonlTrace(join(workspace, "events.jsonl"));
+  const client = await connectClient(workspace);
+  const cases = [
+    {
+      name: "agent_proof_compile_policy",
+      arguments: { response_format: "json" }
+    },
+    {
+      name: "agent_proof_export_trace",
+      arguments: { input: "events.jsonl", response_format: "json" }
+    },
+    {
+      name: "agent_proof_create_bundle",
+      arguments: { scan_path: ".", response_format: "json" }
+    },
+    {
+      name: "agent_proof_sign_bundle",
+      arguments: { response_format: "json" }
+    },
+    {
+      name: "agent_proof_render_dashboard",
+      arguments: { response_format: "json" }
+    }
+  ];
+
+  try {
+    for (const [index, item] of cases.entries()) {
+      const relativePath = `outputs/existing-${index}.artifact`;
+      const absolutePath = join(workspace, relativePath);
+      writeFileSync(absolutePath, "SENTINEL\n");
+      const result = await client.callTool({
+        name: item.name,
+        arguments: { ...item.arguments, write_path: relativePath }
+      });
+      assert.equal(result.isError, true, item.name);
+      assert.match(textContent(result), /fresh regular file/);
+      assert.equal(readFileSync(absolutePath, "utf8"), "SENTINEL\n");
+    }
+  } finally {
+    await client.close();
+  }
+});
+
+test("generic MCP writers refuse final symlinks and hardlinks outside the workspace", {
+  skip: process.platform === "win32"
+}, async () => {
+  const workspace = mkdtempSync(join(tmpdir(), "agent-proof-mcp-link-output-"));
+  const outside = mkdtempSync(join(tmpdir(), "agent-proof-mcp-link-victim-"));
+  const victim = join(outside, "victim.json");
+  writeFileSync(victim, "SENTINEL\n");
+  symlinkSync(victim, join(workspace, "escape.json"));
+  linkSync(victim, join(workspace, "hardlink.json"));
+  const client = await connectClient(workspace);
+
+  try {
+    for (const writePath of ["escape.json", "hardlink.json"]) {
+      const result = await client.callTool({
+        name: "agent_proof_compile_policy",
+        arguments: { write_path: writePath, response_format: "json" }
+      });
+      assert.equal(result.isError, true, writePath);
+      assert.match(textContent(result), /fresh regular file/);
+      assert.equal(readFileSync(victim, "utf8"), "SENTINEL\n");
+    }
   } finally {
     await client.close();
   }

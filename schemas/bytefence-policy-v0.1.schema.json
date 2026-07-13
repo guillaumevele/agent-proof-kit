@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/guillaumevele/agent-proof-kit/v0.5.0/schemas/bytefence-policy-v0.1.schema.json",
+  "title": "ByteFence policy v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "id",
+    "maxTargetBytes",
+    "maxOldBytes",
+    "maxNewBytes",
+    "maxDeletionRatio",
+    "denyFullTargetReplacement",
+    "allowSymlinks",
+    "allowHardlinks",
+    "requireUtf8",
+    "allowNul",
+    "preserveUtf8Bom",
+    "preservePosixMode"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "https://raw.githubusercontent.com/guillaumevele/agent-proof-kit/v0.5.0/schemas/bytefence-policy-v0.1.schema.json"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "maxTargetBytes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 16777216
+    },
+    "maxOldBytes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65536
+    },
+    "maxNewBytes": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 65536
+    },
+    "maxDeletionRatio": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "denyFullTargetReplacement": {
+      "const": true
+    },
+    "allowSymlinks": {
+      "const": false
+    },
+    "allowHardlinks": {
+      "const": false
+    },
+    "requireUtf8": {
+      "const": true
+    },
+    "allowNul": {
+      "const": false
+    },
+    "preserveUtf8Bom": {
+      "const": true
+    },
+    "preservePosixMode": {
+      "const": true
+    }
+  }
+}

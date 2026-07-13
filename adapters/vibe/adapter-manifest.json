@@ -1,0 +1,209 @@
+{
+  "adapter": "bytefence-vibe-explicit-tool",
+  "schemaVersion": "0.1",
+  "target": {
+    "distribution": "mistral-vibe",
+    "version": "2.19.1",
+    "upstreamCommit": "30792a4cac2c2e5173c6b5a98739fbbf36324545",
+    "python": ">=3.12"
+  },
+  "integration": {
+    "projectTool": "bytefence_apply",
+    "sameNameEditOverride": false,
+    "hooksExperimental": true,
+    "beforeToolCanDeny": true,
+    "afterToolCanRollback": false
+  },
+  "projectToolConfigContract": {
+    "fixedFieldsExact": {
+      "permission": "ask",
+      "broker_command": [
+        "agent-proof",
+        "bytefence-apply"
+      ],
+      "root": ".",
+      "policy_path": ".vibe/bytefence-policy.json",
+      "receipt_directory": ".vibe/bytefence-receipts",
+      "receipt_profile": "public",
+      "timeout_seconds": 60.0
+    },
+    "variableFields": {
+      "workspace_id": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024
+      }
+    }
+  },
+  "codeIntegrity": {
+    "algorithm": "sha256",
+    "files": {
+      ".vibe/tools/_bytefence_runtime.py": "640d6014d15029284cc2fe86a50822e1cf1a3e46852033926500beb3cb1937a0",
+      ".vibe/tools/bytefence_apply.py": "e8222dab1345cce2743ed5df2a84d84467109442c249af5d6336b8922dcbbd4e",
+      ".vibe/hooks/bytefence_guard.py": "690eba42e347ef8de89b7d957222c2dda0f8150d5dfeda8c5e232202cbe58ab7"
+    }
+  },
+  "runtimeToolContract": {
+    "selectionEngine": "vibe.core.tools.manager.ToolManager",
+    "singleVariantRequired": true,
+    "tools": {
+      "bytefence_apply": {
+        "sourceRoot": "project",
+        "relativePath": ".vibe/tools/bytefence_apply.py",
+        "class": "ByteFenceApply",
+        "sha256": "e8222dab1345cce2743ed5df2a84d84467109442c249af5d6336b8922dcbbd4e"
+      },
+      "read_file": {
+        "sourceRoot": "vibe-package",
+        "relativePath": "core/tools/builtins/read_file.py",
+        "module": "vibe.core.tools.builtins.read_file",
+        "class": "ReadFile",
+        "sha256": "1bc749984712a2b80a4588db08178165825ca46d0d8414ce6b7d7c75451abdca"
+      },
+      "grep": {
+        "sourceRoot": "vibe-package",
+        "relativePath": "core/tools/builtins/grep.py",
+        "module": "vibe.core.tools.builtins.grep",
+        "class": "Grep",
+        "sha256": "e214193eefbb301b59ce6cac5ddae0d4f2469952087e60ac145b49aa9510000a"
+      },
+      "web_fetch": {
+        "sourceRoot": "vibe-package",
+        "relativePath": "core/tools/builtins/web_fetch.py",
+        "module": "vibe.core.tools.builtins.web_fetch",
+        "class": "WebFetch",
+        "sha256": "7aabe2d5ddaa1c8465708b75a75723e87b632ece07f47f2b66102842faf96c37"
+      },
+      "web_search": {
+        "sourceRoot": "vibe-package",
+        "relativePath": "core/tools/builtins/web_search.py",
+        "module": "vibe.core.tools.builtins.web_search",
+        "class": "WebSearch",
+        "sha256": "d4c27efa8dcd87dc880b1c108b2d4e0e616ed559cc7bae24bef72e761e9300b0"
+      },
+      "todo": {
+        "sourceRoot": "vibe-package",
+        "relativePath": "core/tools/builtins/todo.py",
+        "module": "vibe.core.tools.builtins.todo",
+        "class": "Todo",
+        "sha256": "8da233ac8abe11b86be304ecf08a225f259eb4b744605dc67c8a0b437f80805f"
+      },
+      "ask_user_question": {
+        "sourceRoot": "vibe-package",
+        "relativePath": "core/tools/builtins/ask_user_question.py",
+        "module": "vibe.core.tools.builtins.ask_user_question",
+        "class": "AskUserQuestion",
+        "sha256": "af5eaa977ddac451141c74e8dc5d78dfc40ffb5965b02463da8e7960175fca66"
+      },
+      "skill": {
+        "sourceRoot": "vibe-package",
+        "relativePath": "core/tools/builtins/skill.py",
+        "module": "vibe.core.tools.builtins.skill",
+        "class": "Skill",
+        "sha256": "347e124f3be3adfa022813354a61869fd69e606a70f23f516522174346c0ded0"
+      },
+      "exit_plan_mode": {
+        "sourceRoot": "vibe-package",
+        "relativePath": "core/tools/builtins/exit_plan_mode.py",
+        "module": "vibe.core.tools.builtins.exit_plan_mode",
+        "class": "ExitPlanMode",
+        "sha256": "a8257d41f8c6962496b978463e88a9ac10961394051afef1faf5685f1a1b5387"
+      }
+    }
+  },
+  "runtimeAgentContract": {
+    "module": "vibe.core.agents.models",
+    "relativePath": "core/agents/models.py",
+    "sha256": "a7e799ca93dea82dcec21e42a93133c92c1e815a58c01c641299714de390b02f",
+    "profile": "default",
+    "overridesExact": {
+      "disabled_tools": [
+        "exit_plan_mode"
+      ]
+    },
+    "modelFacingToolsExact": [
+      "bytefence_apply",
+      "read_file",
+      "grep",
+      "web_fetch",
+      "web_search",
+      "todo",
+      "ask_user_question",
+      "skill"
+    ]
+  },
+  "hookContract": [
+    {
+      "name": "bytefence-deny-unmediated-writes",
+      "type": "before_tool",
+      "match": "*",
+      "strict": true,
+      "timeout": 5.0,
+      "description": "Deny declared write side doors before their tool body runs",
+      "command": "python3 .vibe/hooks/bytefence_guard.py --phase before --deny-pattern edit --deny-pattern write_file --deny-pattern bash --deny-pattern task"
+    },
+    {
+      "name": "bytefence-audit-broker-result",
+      "type": "after_tool",
+      "match": "bytefence_apply",
+      "strict": false,
+      "timeout": 5.0,
+      "description": "Record a non-sensitive broker completion event in the Vibe session log",
+      "command": "python3 .vibe/hooks/bytefence_guard.py --phase after"
+    }
+  ],
+  "protectedProfile": {
+    "enabledToolsExact": [
+      "bytefence_apply",
+      "read_file",
+      "grep",
+      "web_fetch",
+      "web_search",
+      "todo",
+      "ask_user_question",
+      "skill",
+      "exit_plan_mode"
+    ],
+    "disabledToolsExact": [],
+    "toolPathsExact": [],
+    "remoteToolSourcesExact": {
+      "mcp_servers": [],
+      "enable_connectors": false,
+      "connectors": []
+    },
+    "agentProfileExact": {
+      "enable_config_orchestrator": false,
+      "agent_paths": [],
+      "default_agent": "default",
+      "enabled_agents": [
+        "default"
+      ],
+      "disabled_agents": [],
+      "installed_agents": []
+    },
+    "externalAgentProfilesAllowed": false,
+    "externalHookFilesAllowed": false,
+    "projectToolsInventoryExact": [
+      ".vibe/tools/_bytefence_runtime.py",
+      ".vibe/tools/bytefence_apply.py"
+    ],
+    "additionalDirectoriesAllowed": false,
+    "experimentalHooksRequired": true,
+    "knownUnmediatedBuiltinsExcluded": [
+      "bash",
+      "edit",
+      "write_file"
+    ],
+    "delegationToolsExcluded": [
+      "task"
+    ],
+    "readOnlyBuiltinsReviewed": [
+      "skill",
+      "web_fetch",
+      "web_search"
+    ],
+    "thirdPartyMutationToolsAllowed": false,
+    "sessionWideEnforcementClaimed": false,
+    "trustedBrokerCommandRequired": true
+  }
+}

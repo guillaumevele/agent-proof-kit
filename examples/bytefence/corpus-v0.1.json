@@ -1,0 +1,343 @@
+{
+  "_type": "ByteFenceAdversarialCorpus/v0.1",
+  "version": "0.1.0",
+  "generatedBy": "scripts/bytefence/generate-corpus.js",
+  "hashAlgorithm": "sha256",
+  "byteContract": "Every .bin artifact is compared as raw bytes. Decoding, EOL conversion and Unicode normalization are forbidden during verification.",
+  "policyPath": "policies/bytefence-default.json",
+  "cases": [
+    {
+      "id": "exact-replace-allowed",
+      "title": "Unique exact replacement",
+      "threat": "control",
+      "description": "A unique local replacement is accepted and the candidate is exactly derivable from the preimage.",
+      "artifacts": {
+        "preimage": {
+          "path": "cases/exact-replace-allowed/preimage.bin",
+          "bytes": 54,
+          "sha256": "737ecf46900dec36b37804e942849395e712b55537b361088365ddb173fa4b3b",
+          "lines": 2
+        },
+        "candidate": {
+          "path": "cases/exact-replace-allowed/candidate.bin",
+          "bytes": 56,
+          "sha256": "2cf2bb35d08a8791f6bdda88d5a09b41ac47c819f1838a3298ddaf23d7e43995",
+          "lines": 2
+        },
+        "intent": {
+          "path": "cases/exact-replace-allowed/intent.json",
+          "bytes": 319,
+          "sha256": "16c110382ba45b5b68c7dced4e56d80fba7f0a5bc3450b641d75ea56d6c121c4"
+        },
+        "expectedCandidate": {
+          "path": "cases/exact-replace-allowed/expected-candidate.bin",
+          "bytes": 56,
+          "sha256": "2cf2bb35d08a8791f6bdda88d5a09b41ac47c819f1838a3298ddaf23d7e43995",
+          "lines": 2
+        }
+      },
+      "expectation": {
+        "status": "allow",
+        "allowed": true,
+        "exitCode": 0,
+        "effectiveGuaranteeLevel": "CORE_PROVEN",
+        "findingCodes": []
+      },
+      "assertions": {
+        "expectedOccurrences": 1,
+        "candidateMatchesExactDerivation": true,
+        "outOfScopeMutation": false
+      }
+    },
+    {
+      "id": "synthetic-truncation-377-to-58",
+      "title": "Synthetic 377-to-58-line truncation",
+      "threat": "truncation",
+      "description": "A synthetic candidate keeps the requested edit but drops lines 59 through 377. It models the shape of a historical report; it is not attributed to a current editor.",
+      "artifacts": {
+        "preimage": {
+          "path": "cases/synthetic-truncation-377-to-58/preimage.bin",
+          "bytes": 10926,
+          "sha256": "56c898b704ddf3ae9486de274667fe106c08d0908a2d7762d791bdef83a26818",
+          "lines": 377
+        },
+        "candidate": {
+          "path": "cases/synthetic-truncation-377-to-58/candidate.bin",
+          "bytes": 1674,
+          "sha256": "97e061927df91ab7be56304868324719d405ff1a2073c6721876f65ef3ff93e3",
+          "lines": 58
+        },
+        "intent": {
+          "path": "cases/synthetic-truncation-377-to-58/intent.json",
+          "bytes": 335,
+          "sha256": "dd23a2194a75b1d4d43fd09b29d0e1580cb061800d754aece3a4f3d393caf4f1"
+        },
+        "expectedCandidate": {
+          "path": "cases/synthetic-truncation-377-to-58/expected-candidate.bin",
+          "bytes": 10925,
+          "sha256": "a9652c3cb9ac839f0369733114e6ed0d6f06fd6b61bca78d229e935154c6964c",
+          "lines": 377
+        }
+      },
+      "expectation": {
+        "status": "deny",
+        "allowed": false,
+        "exitCode": 1,
+        "effectiveGuaranteeLevel": "OUT_OF_SCOPE",
+        "findingCodes": [
+          "candidate.derivationMismatch"
+        ]
+      },
+      "assertions": {
+        "beforeLines": 377,
+        "proposedLines": 58,
+        "expectedOccurrences": 1,
+        "candidateMatchesExactDerivation": false,
+        "outOfScopeMutation": true
+      },
+      "provenance": {
+        "kind": "synthetic-historical-shape",
+        "qualification": "unconfirmed and not a current native-tool claim"
+      }
+    },
+    {
+      "id": "ambiguous-occurrences-denied",
+      "title": "Ambiguous replacement anchor",
+      "threat": "ambiguous-scope",
+      "description": "The declared anchor occurs twice while the v0.1 contract requires exactly one occurrence.",
+      "artifacts": {
+        "preimage": {
+          "path": "cases/ambiguous-occurrences-denied/preimage.bin",
+          "bytes": 51,
+          "sha256": "ebaa18bca470044f014946fb616e0d8192449ffe79db9dd6d85af9d887e31a3a",
+          "lines": 4
+        },
+        "candidate": {
+          "path": "cases/ambiguous-occurrences-denied/candidate.bin",
+          "bytes": 51,
+          "sha256": "86407d82d5e32dbacd400a6fe937a7b5f57b1b6cdf343568b7cdacc5552f0342",
+          "lines": 4
+        },
+        "intent": {
+          "path": "cases/ambiguous-occurrences-denied/intent.json",
+          "bytes": 310,
+          "sha256": "81c7cd6bbff598c40d133f5b23c825f60c15c6d0ceb03fa80f3fc7c10eb902e9"
+        }
+      },
+      "expectation": {
+        "status": "deny",
+        "allowed": false,
+        "exitCode": 1,
+        "effectiveGuaranteeLevel": "OUT_OF_SCOPE",
+        "findingCodes": [
+          "occurrence.mismatch"
+        ]
+      },
+      "assertions": {
+        "expectedOccurrences": 1,
+        "observedOccurrences": 2,
+        "candidateMatchesExactDerivation": false,
+        "outOfScopeMutation": true
+      }
+    },
+    {
+      "id": "vibe-mixed-eol-out-of-scope",
+      "title": "Mixed-EOL normalization outside the anchor",
+      "threat": "representation-normalization",
+      "description": "The proposed candidate contains the requested edit but converts the isolated LF to CRLF outside the declared range.",
+      "artifacts": {
+        "preimage": {
+          "path": "cases/vibe-mixed-eol-out-of-scope/preimage.bin",
+          "bytes": 90,
+          "sha256": "61757d5fd31b926962c42e53814e7a9b0cf6b6ec28c0203a08098fdcd75a8375",
+          "lines": 4
+        },
+        "candidate": {
+          "path": "cases/vibe-mixed-eol-out-of-scope/candidate.bin",
+          "bytes": 90,
+          "sha256": "e9e38d550a95654d58ab205d800bf360de019a1aa04a52841eb921673fb15b2c",
+          "lines": 4
+        },
+        "intent": {
+          "path": "cases/vibe-mixed-eol-out-of-scope/intent.json",
+          "bytes": 327,
+          "sha256": "2ed55e5301aaaa3e2122917576afd63f47f3e6e556bcd54de5ca6f1b35bb4dd2"
+        },
+        "expectedCandidate": {
+          "path": "cases/vibe-mixed-eol-out-of-scope/expected-candidate.bin",
+          "bytes": 89,
+          "sha256": "d41547480d296f6e756e00bbbdb89a444cc9591054d818093e242b3b17f8663c",
+          "lines": 4
+        }
+      },
+      "expectation": {
+        "status": "deny",
+        "allowed": false,
+        "exitCode": 1,
+        "effectiveGuaranteeLevel": "OUT_OF_SCOPE",
+        "findingCodes": [
+          "candidate.derivationMismatch"
+        ]
+      },
+      "assertions": {
+        "expectedOccurrences": 1,
+        "majorityEol": "CRLF",
+        "minorityEol": "LF",
+        "candidateMatchesExactDerivation": false,
+        "outOfScopeMutation": true
+      },
+      "provenance": {
+        "kind": "version-pinned-interoperability-reproduction",
+        "producer": "Mistral Vibe",
+        "rfcAdapterTarget": "2.19.1",
+        "locallyReproducedWith": "2.19.0",
+        "localReproductionScript": "scripts/bytefence/reproduce-vibe-mixed-eol.js",
+        "networkOrModelRequired": false,
+        "ciDependency": false
+      }
+    },
+    {
+      "id": "utf8-bom-removal-denied",
+      "title": "UTF-8 BOM removal",
+      "threat": "representation-normalization",
+      "description": "The local text edit is present, but the initial UTF-8 BOM has been removed outside the declared mutation range.",
+      "artifacts": {
+        "preimage": {
+          "path": "cases/utf8-bom-removal-denied/preimage.bin",
+          "bytes": 73,
+          "sha256": "9ef3ce831882f1d18f5dc9bed9f1beaf7d1f2f67bcd9720c67f37eb3fbb396c9",
+          "lines": 4
+        },
+        "candidate": {
+          "path": "cases/utf8-bom-removal-denied/candidate.bin",
+          "bytes": 69,
+          "sha256": "88f3dceb21a708d702393a76ab14e72c848d95fbbb981826d4c950cf5c86248b",
+          "lines": 4
+        },
+        "intent": {
+          "path": "cases/utf8-bom-removal-denied/intent.json",
+          "bytes": 318,
+          "sha256": "198bd8d362870b48d3aa7c11525cd09d86af95dff090962fbd50b3d01a821c4d"
+        },
+        "expectedCandidate": {
+          "path": "cases/utf8-bom-removal-denied/expected-candidate.bin",
+          "bytes": 72,
+          "sha256": "b6394afe5a3a6067803587c95885a8377e655df1eae9392451498582e457bad9",
+          "lines": 4
+        }
+      },
+      "expectation": {
+        "status": "deny",
+        "allowed": false,
+        "exitCode": 1,
+        "effectiveGuaranteeLevel": "OUT_OF_SCOPE",
+        "findingCodes": [
+          "candidate.derivationMismatch",
+          "candidate.bomChanged"
+        ]
+      },
+      "assertions": {
+        "expectedOccurrences": 1,
+        "preimageStartsWithUtf8Bom": true,
+        "candidateStartsWithUtf8Bom": false,
+        "candidateMatchesExactDerivation": false,
+        "outOfScopeMutation": true
+      }
+    },
+    {
+      "id": "unicode-nfc-nfd-out-of-scope",
+      "title": "NFC normalization of an out-of-range NFD sequence",
+      "threat": "representation-normalization",
+      "description": "The requested ASCII edit is present, but an NFD e-plus-combining-acute sequence outside the range is normalized to NFC. The astral marker remains intact.",
+      "artifacts": {
+        "preimage": {
+          "path": "cases/unicode-nfc-nfd-out-of-scope/preimage.bin",
+          "bytes": 73,
+          "sha256": "aff2f9748c2e2f25aa53a54f6dd72bab7d6aec18ecdad87fef9580eff0eef6ac",
+          "lines": 4
+        },
+        "candidate": {
+          "path": "cases/unicode-nfc-nfd-out-of-scope/candidate.bin",
+          "bytes": 71,
+          "sha256": "ded16f0c0139e5c29de19fb8d01f34096aa5f258cd87ced1aa8ceab93bc8386a",
+          "lines": 4
+        },
+        "intent": {
+          "path": "cases/unicode-nfc-nfd-out-of-scope/intent.json",
+          "bytes": 322,
+          "sha256": "a380a43b00abcffc6ce9e1a755191caaded9989146096360165490dbb8308872"
+        },
+        "expectedCandidate": {
+          "path": "cases/unicode-nfc-nfd-out-of-scope/expected-candidate.bin",
+          "bytes": 72,
+          "sha256": "d684c6e2903048ed9b73ac330a1b2b1e56767d5fa1ab47fcc1266ee87584d449",
+          "lines": 4
+        }
+      },
+      "expectation": {
+        "status": "deny",
+        "allowed": false,
+        "exitCode": 1,
+        "effectiveGuaranteeLevel": "OUT_OF_SCOPE",
+        "findingCodes": [
+          "candidate.derivationMismatch"
+        ]
+      },
+      "assertions": {
+        "expectedOccurrences": 1,
+        "containsNfcAndNfd": true,
+        "containsAstralUtf8": true,
+        "candidateMatchesExactDerivation": false,
+        "outOfScopeMutation": true
+      }
+    },
+    {
+      "id": "full-target-rewrite-denied",
+      "title": "Self-declared full-target rewrite",
+      "threat": "full-rewrite",
+      "description": "The candidate exactly matches the declared replacement, but v0.1 policy denies full-target rewrites and the embedded approval claim has no authority.",
+      "artifacts": {
+        "preimage": {
+          "path": "cases/full-target-rewrite-denied/preimage.bin",
+          "bytes": 94,
+          "sha256": "db599e2610d7826df94cbc4fc27c4a05590f89b539d17792aa27509dfcbee040",
+          "lines": 7
+        },
+        "candidate": {
+          "path": "cases/full-target-rewrite-denied/candidate.bin",
+          "bytes": 125,
+          "sha256": "1f02b0412c2b75ceeb750c3de8dad640cf9e9ab33ef8d4c07ef280f068e6ea62",
+          "lines": 8
+        },
+        "intent": {
+          "path": "cases/full-target-rewrite-denied/intent.json",
+          "bytes": 523,
+          "sha256": "494501e6f514d010e70f57a606e68ddecf433e5a2f9eaccd43f4e5f6f76ce1f9"
+        },
+        "expectedCandidate": {
+          "path": "cases/full-target-rewrite-denied/expected-candidate.bin",
+          "bytes": 125,
+          "sha256": "1f02b0412c2b75ceeb750c3de8dad640cf9e9ab33ef8d4c07ef280f068e6ea62",
+          "lines": 8
+        }
+      },
+      "expectation": {
+        "status": "deny",
+        "allowed": false,
+        "exitCode": 1,
+        "effectiveGuaranteeLevel": "OUT_OF_SCOPE",
+        "findingCodes": [
+          "change.fullTargetDenied",
+          "change.deletionRatioExceeded"
+        ]
+      },
+      "assertions": {
+        "expectedOccurrences": 1,
+        "replacesFullTarget": true,
+        "candidateMatchesExactDerivation": true,
+        "outOfScopeMutation": false,
+        "selfDeclaredApprovalHasAuthority": false
+      }
+    }
+  ]
+}

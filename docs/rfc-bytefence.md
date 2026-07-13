@@ -1,6 +1,6 @@
 # RFC: ByteFence mediated writes
 
-Status: **Approved design; implementation in progress**
+Status: **Implemented for Agent Proof Kit v0.5.0**
 
 Date: 2026-07-13
 
@@ -12,9 +12,9 @@ preimage bytes, inside a declared mutation scope and under a versioned policy.
 For writes mediated by its own transactional tool, it can deny the operation
 before mutation and emit a machine-verifiable before/proposed/after receipt.
 
-Implementation proceeds from a pure read-only evaluator to the mediated writer,
-but no public release may claim prevention until the writer, crash behavior and
-supported-platform boundaries are tested. ByteFence does not claim that the
+Version 0.5.0 implements the read-only evaluator, mediated writer, CLI, MCP
+tools, Vibe adapter, corpus and verification paths described here. Remote matrix
+status remains visible in GitHub Actions. ByteFence does not claim that the
 resulting code is semantically correct.
 
 The public product name remains unresolved. “ByteFence” is a development
@@ -109,7 +109,7 @@ a weaker level:
 | Level | Meaning |
 | --- | --- |
 | `CORE_PROVEN` | Digests, occurrence count, exact byte derivation, mutation ranges, policy and receipt can be independently recomputed. |
-| `MEDIATED_PROVEN` | On a supported local filesystem, all cooperating writers used the ByteFence lock protocol; the target was rechecked immediately before an atomic replacement and matched the authorized candidate immediately afterwards. Accepting this level outside the producing process requires an authenticated receipt from a policy-trusted ByteFence producer. |
+| `MEDIATED_PROVEN` | On a supported local filesystem, all cooperating writers used the ByteFence lock protocol; the target was rechecked immediately before an atomic replacement and matched the authorized candidate immediately afterwards. Accepting this level requires explicit trust in the producer and mediation environment. |
 | `POSTHOC_DETECTED` | A later observation found that the target did or did not match an authorized candidate; this is detection, not prevention. |
 | `OUT_OF_SCOPE` | The operation used an unmediated writer or an unsupported environment, so ByteFence makes no write-integrity claim. |
 
@@ -120,11 +120,17 @@ prevents stale-base commits between cooperating brokers and provides atomic
 visibility; it does not prove the absence of every lost update.
 
 A Statement carries `declaredGuaranteeLevel`. Verification returns a separate
-`effectiveGuaranteeLevel`. A bare or digest-only Statement can establish
-`CORE_PROVEN` by recomputation, but an external verifier must not accept
-`MEDIATED_PROVEN` without a valid DSSE signature and a policy-trusted producer
-identity. The in-process apply result may report the mediated level for that
-execution; persistence alone does not authenticate it.
+`effectiveGuaranteeLevel`. A post-apply Statement may declare
+`MEDIATED_PROVEN`, but both the live apply result and bare-receipt verification
+remain effectively `CORE_PROVEN` by default. The apply result exposes
+`mediationEnvironmentTrusted: false`; the CLI and MCP paths do not infer
+filesystem capability. Accepting the mediated level requires an explicit
+authenticator that establishes both a policy-trusted producer and the mediation
+environment. Persistence or JSON shape alone authenticates neither.
+The programmatic verifier therefore requires its trust callback to return both
+own decisions, `producerAuthenticated: true` and
+`mediationEnvironmentTrusted: true`; booleans, inherited properties and partial
+decisions cannot promote the effective level.
 
 ### Covered
 
@@ -163,7 +169,7 @@ contains only its digest. The initial operation is `exactReplace`:
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/guillaumevele/agent-proof-kit/main/schemas/bytefence-intent-v0.1.schema.json",
+  "$schema": "https://raw.githubusercontent.com/guillaumevele/agent-proof-kit/v0.5.0/schemas/bytefence-intent-v0.1.schema.json",
   "operation": "exactReplace",
   "targetPath": "src/pages/index.astro",
   "encoding": "utf-8",
@@ -193,7 +199,7 @@ scoring policy. The bundled policy starts with these conservative limits:
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/guillaumevele/agent-proof-kit/main/schemas/bytefence-policy-v0.1.schema.json",
+  "$schema": "https://raw.githubusercontent.com/guillaumevele/agent-proof-kit/v0.5.0/schemas/bytefence-policy-v0.1.schema.json",
   "id": "bytefence-default",
   "maxTargetBytes": 10485760,
   "maxOldBytes": 65536,
@@ -214,6 +220,14 @@ preimage, which is unsupported for `exactReplace`. Policy documents reject
 unknown keys. The runtime parser must enforce every schema keyword used by the
 contract; a JSON schema file is not evidence of validation by itself.
 
+Policy values can only tighten the runtime envelope. v0.1 applies non-configurable
+upper bounds of 1 MiB for an intent document, 64 KiB for a policy document,
+4 MiB for a receipt document, 16 MiB for a target and 64 KiB each for
+`oldText` and `newText`. The bundled policy tightens the target limit to
+10 MiB. Exceeding a policy limit is a denial; exceeding an absolute document or
+runtime limit is invalid input. Bounded reads enforce these limits before a
+document is parsed or an entire target is buffered.
+
 ### Workspace and event binding
 
 The caller supplies a non-sensitive `workspaceId`. Receipts store only its
@@ -228,15 +242,14 @@ The receipt is an
 Its subject is the immutable candidate. The predicate binds the preimage,
 declared intent, policy and decision.
 
-Provisional predicate type:
+Predicate type for the v0.5.0 implementation release:
 
 ```text
-https://raw.githubusercontent.com/guillaumevele/agent-proof-kit/main/schemas/bytefence-statement-v0.1.schema.json
+https://raw.githubusercontent.com/guillaumevele/agent-proof-kit/v0.5.0/schemas/bytefence-statement-v0.1.schema.json
 ```
 
-The `main` URLs are provisional during implementation. A public release must
-replace them with immutable tag-backed URLs and bind the exact contract bytes by
-SHA-256 in the predicate.
+The contract uses immutable tag-backed URLs and binds the exact Statement schema
+bytes by SHA-256 in the predicate.
 
 ```json
 {
@@ -248,7 +261,7 @@ SHA-256 in the predicate.
       "mediaType": "text/plain"
     }
   ],
-  "predicateType": "https://raw.githubusercontent.com/guillaumevele/agent-proof-kit/main/schemas/bytefence-statement-v0.1.schema.json",
+  "predicateType": "https://raw.githubusercontent.com/guillaumevele/agent-proof-kit/v0.5.0/schemas/bytefence-statement-v0.1.schema.json",
   "predicate": {
     "operationId": "bf-...",
     "observedAt": "2026-07-13T10:00:00Z",
@@ -311,10 +324,17 @@ target path, repository, commit, trace identifiers, preimage, candidate, prompt
 or tool arguments. An explicit `local` diagnostic profile may add the relative
 target path and correlation identifiers; it remains private by default and is
 written with restrictive permissions where supported. Public artifacts in this
-repository must use the `public` profile. A digest of a low-entropy path can
-still be guessed with a dictionary; this profile removes cleartext but does not
-promise path confidentiality. `contextSignals` is ByteFence-specific and must
-not be emitted as an OpenTelemetry semantic-convention attribute.
+repository must use the `public` profile. Digests can still link or reveal
+low-entropy paths, workspace IDs and small file contents through guessing; this
+profile removes cleartext but does not promise confidentiality or anonymity.
+`contextSignals` is ByteFence-specific and must not be emitted as an
+OpenTelemetry semantic-convention attribute.
+
+The verifier reports `publicProfileConformant` for public receipts. Unknown
+in-toto top-level, subject or digest extensions do not change recomputed
+`CORE_PROVEN` integrity, but they set that flag to `false` and add a finding
+because an unreviewed extension may contain cleartext. Unknown predicate fields
+remain invalid. A local-profile receipt reports no public-profile conclusion.
 
 An additive Agent Proof Kit evidence record can reference the receipt:
 
@@ -386,8 +406,9 @@ The verifier fails closed when any of these conditions is not satisfied:
 13. A `postApply` receipt declares `MEDIATED_PROVEN` only when the observed
     target matches the candidate digest, the embedded preflight Statement is
     referenced by digest and the cooperating-writer lock protocol was active.
-    External verification downgrades the effective level unless trusted producer
-    authentication also succeeds.
+    Apply and external verification keep the effective level at `CORE_PROVEN`
+    unless an explicit authenticator establishes the trusted producer and
+    mediation environment.
 
 A context-pressure or compaction signal can inform review, but cannot prove
 corruption and must never block on its own.
@@ -401,14 +422,14 @@ corruption and must never block on its own.
 - `bytefence-verify` receives an explicit preserved preimage at
   `--before`, plus candidate, intent and policy, and recomputes the preflight
   decision.
-- A `postApply` receipt is emitted only by `bytefence-apply`. It binds the
-  embedded preflight Statement digest, rehashes the final target and records
-  the declared guarantee level. An external writer cannot obtain an effective
-  `MEDIATED_PROVEN` result by submitting a before/after pair after the fact.
+- `bytefence-apply` emits a `postApply` receipt that binds the embedded preflight
+  Statement digest, rehashes the final target and records the declared guarantee
+  level. The JSON shape can be constructed independently, so it remains
+  effectively `CORE_PROVEN` without explicit producer and environment trust.
 - A post-apply receipt can become stale immediately after it is emitted. It
   proves the state observed at that instant, not permanent future state.
 
-## Proposed CLI
+## CLI
 
 The existing CLI uses flat commands, so hyphenated commands avoid a parser
 rewrite in the first phase.
@@ -461,6 +482,10 @@ observed state and emits a post-apply receipt. Parent-directory flushing is used
 where the platform exposes a supported operation. These steps do not remove the
 documented race with non-cooperating writers.
 
+A successful apply result declares `MEDIATED_PROVEN` in the transaction evidence
+but exposes `effectiveGuaranteeLevel: "CORE_PROVEN"` and
+`mediationEnvironmentTrusted: false`. No CLI or MCP flag silently promotes it.
+
 ### Cooperative lock and commit protocol
 
 For v0.1 the protocol is reproducible and intentionally conservative:
@@ -503,18 +528,49 @@ plane, not the transaction:
   protected profile denies those surfaces entirely;
 - an empty successful hook output is not an affirmative ByteFence decision.
 
-The enforced adapter therefore supplies a project tool discovered from
-`.vibe/tools/` that delegates the complete edit to `bytefence-apply`. A
-version-pinned compatibility test may let that tool replace Vibe's built-in
-`edit` variant. This uses an experimental internal extension surface and must
-fall back to an explicitly named ByteFence tool when compatibility fails.
-Hooks may deny side doors, but they never rewrite shell commands or perform the
-filesystem mutation themselves.
+The enforced adapter therefore supplies an explicitly named project tool from
+`.vibe/tools/` that delegates the complete edit to `bytefence-apply`. It does
+not replace Vibe's built-in `edit` variant. This uses an experimental internal
+extension surface and falls back to explicit-tool-only or unsupported mode when
+compatibility fails. Hooks may deny side doors, but they never rewrite shell
+commands or perform the filesystem mutation themselves.
 
-The Vibe adapter reports `MEDIATED_PROVEN` only when the ByteFence tool
-performed the write and the configured session disabled known unmediated
-mutation surfaces. Otherwise it records `POSTHOC_DETECTED` or `OUT_OF_SCOPE`
-with the enabled surfaces listed.
+`check_compatibility.py --project-root <path>` inspects the deployed copy at
+probe time: the Vibe version and APIs, importable tool and validated config,
+exact broker security fields, allowlist, empty local and remote extension
+sources, default-agent settings, enabled hooks with exact strictness, and
+SHA-256 digests for the adapter runtime, tool and guard. Vibe selects the
+trusted project's config instead of merging the user config, but separately
+discovers user/additional-directory hooks and user/project agent profiles. The
+checker therefore composes hooks through Vibe's own loader, rejects every
+external hook or agent TOML, attests the pinned builtin `default` profile and
+applies its overrides.
+
+It also runs the pinned `ToolManager` selection over builtins, project tools and
+the current user-tool directory. Each of the nine configured names must have
+one variant, the selected class origin and digest must match the manifest, and
+the default agent must expose exactly the reviewed eight-name model-facing set.
+A dedicated `VIBE_HOME` may contain an ordinary, size-bounded `.env` with no
+assignments or exactly one non-empty `MISTRAL_API_KEY`. Other dotenv keys,
+non-empty process `VIBE_*` overrides apart from `VIBE_HOME`, documented
+Python/Node/shell or loader injection variables, and any observed `--add-dir`
+are unsupported.
+The manifest itself is not authenticated, and the probe cannot predict later
+CLI overrides or prove the files remain unchanged.
+
+The adapter success state is `committed-and-receipted`. It confirms that a fresh
+regular receipt remained stable while a bounded 4 MiB read was hashed; it does
+not semantically reverify the receipt. The private mode-0600 intent is removed
+on handled exit and cancellation, but `SIGKILL` or a process crash can leave it
+for operating-system or operator cleanup. The underlying apply result still
+declares mediation evidence while remaining effectively `CORE_PROVEN` with an
+untrusted mediation environment by default.
+
+The hook command resolves `python3` and the broker command resolves
+`agent-proof` through `PATH`. The compatibility checker verifies the reviewed
+command strings but not the executables selected at launch. `PATH`, the Python
+interpreter and the broker remain roots of trust, so adapter compatibility alone
+cannot promote the effective guarantee above `CORE_PROVEN`.
 
 ### MCP
 
@@ -637,6 +693,6 @@ prevention claim and remain a verifier.
 6. No approval artifact exists in v0.1. Full-file and policy-defined large
    rewrites are denied rather than “approved.”
 7. The first ByteFence implementation release bumps `engines.node` to `>=22`;
-   the current v0.4.1 remains installable under its published contract because
+   the previously published v0.4.1 remains installable under its contract because
    it contains no ByteFence runtime. Node.js 22 and 24 are release lines. Node
    26 Current may run as an informative CI job but is not a release guarantee.

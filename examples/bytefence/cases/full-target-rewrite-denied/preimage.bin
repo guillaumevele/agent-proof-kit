@@ -1,0 +1,7 @@
+policy=strict
+owner=human
+network=denied
+audit=required
+retention=30d
+region=eu
+status=active
