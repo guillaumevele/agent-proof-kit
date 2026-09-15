@@ -5,7 +5,8 @@ export const supportedTraceSources = [
   "generic-jsonl",
   "langgraph-stream",
   "crewai-events",
-  "autogen-run-stream"
+  "autogen-run-stream",
+  "codex-exec-jsonl"
 ];
 
 export function exportTraceFixture(text, options = {}) {
@@ -36,6 +37,9 @@ function adaptTrace(text, source) {
   }
   if (source === "autogen-run-stream") {
     return adaptAutoGenRunStream(text);
+  }
+  if (source === "codex-exec-jsonl") {
+    return adaptCodexExecJsonl(text);
   }
   throw new Error(`Unsupported trace source: ${source}`);
 }
@@ -256,6 +260,277 @@ function adaptAutoGenRunStream(text) {
 
   ensureOutput(run, "autogen-final-output", "AutoGen synthetic run_stream messages were normalized into auditable agent steps.");
   return run;
+}
+
+const codexItemOutcomes = {
+  completed: "completed",
+  failed: "failed",
+  declined: "refused"
+};
+
+// Normalizes the JSONL stream written by `codex exec --json` (thread.*, turn.*,
+// item.* and error events). Only item.completed records become actions; items
+// that start but never complete are recorded as `incomplete`. Reasoning text,
+// command output and MCP tool arguments are intentionally not copied into the
+// fixture. Shell commands are not risk-classified: they are exported as
+// `command` actions and the policy decides how to treat them.
+function adaptCodexExecJsonl(text) {
+  const { records } = parseTraceRecords(text, ["events"]);
+  const threadEvent = records.find((event) => event?.type === "thread.started");
+  const threadId = typeof threadEvent?.thread_id === "string" ? threadEvent.thread_id : null;
+  const run = createRun({
+    source: "codex exec --json",
+    runId: threadId ? `codex-exec-${slug(threadId)}` : "codex-exec-run",
+    subject: "Codex CLI exec run",
+    generatedAt: null,
+    agent: { name: "Codex CLI", provider: "openai-codex" }
+  });
+  run.synthetic = false;
+  run.objectives = ["Normalize a codex exec --json event stream into an Agent Proof Kit run."];
+
+  const pending = new Map();
+  const counters = { turn: 0, command: 0, patch: 0, mcp: 0, search: 0, collab: 0, message: 0, error: 0 };
+
+  for (const event of records) {
+    if (!event || typeof event !== "object") continue;
+    const type = String(event.type ?? "");
+
+    if (type === "turn.started") {
+      counters.turn += 1;
+      continue;
+    }
+
+    if (type === "turn.completed") {
+      const usage = event.usage ?? {};
+      run.evidence.push({
+        id: `codex-turn-${Math.max(counters.turn, 1)}-completed`,
+        kind: "codex_turn_completed",
+        result: "pass",
+        excerpt: `input_tokens=${usage.input_tokens ?? "?"} output_tokens=${usage.output_tokens ?? "?"} reasoning_output_tokens=${usage.reasoning_output_tokens ?? "?"}`
+      });
+      continue;
+    }
+
+    if (type === "turn.failed" || type === "error") {
+      counters.error += 1;
+      const message = type === "error" ? event.message : event.error?.message;
+      run.evidence.push({
+        id: `codex-${type === "error" ? "stream-error" : "turn-failed"}-${counters.error}`,
+        kind: type === "error" ? "codex_stream_error" : "codex_turn_failed",
+        result: "fail",
+        excerpt: excerpt(String(message ?? "unknown error"))
+      });
+      continue;
+    }
+
+    if (type === "item.started" || type === "item.updated") {
+      const item = event.item;
+      if (item?.id) pending.set(item.id, item);
+      continue;
+    }
+
+    if (type !== "item.completed") continue;
+    const item = event.item;
+    if (!item || typeof item !== "object") continue;
+    if (item.id) pending.delete(item.id);
+    addCodexItem(run, item, counters, "completed");
+  }
+
+  for (const item of pending.values()) {
+    addCodexItem(run, item, counters, "incomplete");
+  }
+
+  ensureOutput(run, "codex-exec-final-output", "Codex exec event stream was normalized into auditable agent steps.");
+  return run;
+}
+
+function addCodexItem(run, item, counters, phase) {
+  const itemType = String(item.type ?? "");
+  const statusOutcome = (status) => (phase === "incomplete" ? "incomplete" : codexItemOutcomes[status] ?? "unknown");
+
+  if (itemType === "command_execution") {
+    counters.command += 1;
+    const actionId = `codex-command-${counters.command}`;
+    const evidenceId = `${actionId}-evidence`;
+    run.actions.push({
+      id: actionId,
+      type: "command",
+      target: excerpt(String(item.command ?? "unknown command")),
+      approval: "not_recorded",
+      outcome: statusOutcome(item.status),
+      note: "Shell command executed by Codex. Risk is not inferred from the command text."
+    });
+    run.evidence.push({
+      id: evidenceId,
+      kind: "codex_command_execution",
+      result: item.status === "completed" && item.exit_code === 0 ? "pass" : "fail",
+      excerpt: `status=${item.status ?? "unknown"} exit_code=${item.exit_code ?? "none"}`
+    });
+    return;
+  }
+
+  if (itemType === "file_change") {
+    const changes = Array.isArray(item.changes) ? item.changes : [];
+    for (const change of changes) {
+      counters.patch += 1;
+      const actionId = `codex-file-change-${counters.patch}`;
+      run.actions.push({
+        id: actionId,
+        type: change?.kind === "delete" ? "destructive" : "unmediated_write",
+        target: String(change?.path ?? "unknown path"),
+        approval: "not_recorded",
+        outcome: statusOutcome(item.status),
+        note: `Codex patch (${change?.kind ?? "unknown"}) applied outside ByteFence mediation.`
+      });
+      run.evidence.push({
+        id: `${actionId}-evidence`,
+        kind: "codex_file_change",
+        result: item.status === "completed" ? "pass" : "fail",
+        excerpt: `kind=${change?.kind ?? "unknown"} status=${item.status ?? "unknown"}`
+      });
+    }
+    return;
+  }
+
+  if (itemType === "mcp_tool_call") {
+    counters.mcp += 1;
+    const tool = String(item.tool ?? "unknown");
+    const server = String(item.server ?? "unknown");
+    const actionId = `codex-mcp-${counters.mcp}-${slug(tool)}`;
+    const evidenceId = `${actionId}-evidence`;
+    const summary = parseByteFenceToolResult(item);
+
+    if (tool === "bytefence_apply") {
+      const committed = summary?.status === "allow" && summary?.exitCode === 0 && summary?.receiptPersisted === true;
+      const denied = summary && summary.exitCode !== 3 && summary.status !== "allow";
+      run.actions.push({
+        id: actionId,
+        type: "write",
+        target: `bytefence:${String(item.arguments?.intent_path ?? "unknown intent")}`,
+        approval: "not_recorded",
+        outcome: phase === "incomplete" ? "incomplete" : committed ? "completed" : denied ? "blocked" : "unknown",
+        note: `ByteFence mediated write through MCP server '${server}'.`
+      });
+      run.evidence.push({
+        id: evidenceId,
+        kind: "bytefence_apply_result",
+        result: committed ? "pass" : "fail",
+        excerpt: summary
+          ? `status=${summary.status} exitCode=${summary.exitCode} effectiveGuaranteeLevel=${summary.effectiveGuaranteeLevel} receiptPersisted=${summary.receiptPersisted === true}`
+          : `status=${item.status ?? "unknown"} (result was not a ByteFence JSON summary)`
+      });
+      return;
+    }
+
+    run.actions.push({
+      id: actionId,
+      type: tool === "bytefence_check" ? "read" : "mcp_tool",
+      target: `mcp:${server}/${tool}`,
+      approval: "not_recorded",
+      outcome: statusOutcome(item.status),
+      note: "MCP tool call dispatched by Codex. Arguments are not exported."
+    });
+    run.evidence.push({
+      id: evidenceId,
+      kind: "codex_mcp_tool_call",
+      result: item.status === "completed" && !item.error ? "pass" : "fail",
+      excerpt: summary
+        ? `status=${summary.status} exitCode=${summary.exitCode} effectiveGuaranteeLevel=${summary.effectiveGuaranteeLevel}`
+        : `status=${item.status ?? "unknown"}${item.error?.message ? ` error=${excerpt(item.error.message)}` : ""}`
+    });
+    return;
+  }
+
+  if (itemType === "web_search") {
+    counters.search += 1;
+    run.actions.push({
+      id: `codex-web-search-${counters.search}`,
+      type: "network",
+      target: "web_search",
+      approval: "not_recorded",
+      outcome: phase === "incomplete" ? "incomplete" : "completed",
+      note: "Web search requested by Codex. The query is not exported."
+    });
+    return;
+  }
+
+  if (itemType === "collab_tool_call") {
+    counters.collab += 1;
+    run.actions.push({
+      id: `codex-subagent-${counters.collab}`,
+      type: "subagent",
+      target: `collab:${String(item.tool ?? "unknown")}`,
+      approval: "not_recorded",
+      outcome: statusOutcome(item.status),
+      note: "Codex collaboration tool call. Prompts are not exported."
+    });
+    return;
+  }
+
+  if (itemType === "agent_message" && phase === "completed") {
+    counters.message += 1;
+    const evidenceId = `codex-message-${counters.message}-evidence`;
+    run.evidence.push({
+      id: evidenceId,
+      kind: "codex_agent_message",
+      result: "pass",
+      excerpt: `agent_message item ${String(item.id ?? counters.message)}`
+    });
+    run.outputs.push({
+      id: `codex-message-${counters.message}`,
+      channel: "codex",
+      content: String(item.text ?? ""),
+      claims: [
+        {
+          text: "Codex emitted this agent message during the exec run.",
+          evidence: evidenceId
+        }
+      ]
+    });
+    return;
+  }
+
+  if (itemType === "error") {
+    counters.error += 1;
+    run.evidence.push({
+      id: `codex-item-error-${counters.error}`,
+      kind: "codex_item_error",
+      result: "warn",
+      excerpt: excerpt(String(item.message ?? "unknown error"))
+    });
+    return;
+  }
+
+  // reasoning and todo_list items are deliberately not exported.
+  if (itemType === "reasoning" || itemType === "todo_list" || itemType === "agent_message") return;
+
+  // Unrecognized item types fail closed: they become actions whose type no
+  // bundled policy classifies, so a newer Codex surface cannot pass silently.
+  counters.unknown = (counters.unknown ?? 0) + 1;
+  run.actions.push({
+    id: `codex-unrecognized-${counters.unknown}`,
+    type: `codex_item:${slug(itemType || "missing")}`,
+    target: `codex.item:${String(item.id ?? counters.unknown)}`,
+    approval: "not_recorded",
+    outcome: phase === "incomplete" ? "incomplete" : "unknown",
+    note: "Unrecognized codex exec item type. Classify it in policy.actionRisk after review."
+  });
+}
+
+function parseByteFenceToolResult(item) {
+  const blocks = Array.isArray(item?.result?.content) ? item.result.content : [];
+  for (const block of blocks) {
+    if (block?.type !== "text" || typeof block.text !== "string") continue;
+    try {
+      const parsed = JSON.parse(block.text);
+      if (parsed && typeof parsed === "object" && typeof parsed.status === "string" && "exitCode" in parsed) {
+        return parsed;
+      }
+    } catch {
+      // Not a JSON ByteFence summary.
+    }
+  }
+  return null;
 }
 
 function createRun({ source, runId, subject, generatedAt, agent }) {

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a vulnerability privately
+    url: https://github.com/guillaumevele/agent-proof-kit/security/advisories/new
+    about: Please do not open public issues for security problems.
+  - name: Codex CLI integration guide
+    url: https://github.com/guillaumevele/agent-proof-kit/blob/main/docs/integrations/codex.md
+    about: Setup, limits and CI gating for Codex runs.

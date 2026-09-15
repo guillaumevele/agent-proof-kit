@@ -14,9 +14,10 @@ model call, and no network access after installation. Installation itself may
 fetch lockfile-pinned dependencies. ByteFence reads local project bytes, but
 its public receipt omits source fragments and prompts.
 
-Maturity: ByteFence ships in v0.5.0 and is backed by deterministic local and CI
-tests. The workflow badge is the live source for matrix status. The project is
-tested against synthetic fixtures and is not presented as production-proven.
+Maturity: ByteFence shipped in v0.5.0 and v0.6.0 adds Codex CLI support. Both
+are backed by deterministic local and CI tests. The workflow badge is the live
+source for matrix status. The project is tested against synthetic fixtures and
+is not presented as production-proven.
 
 ## Install
 
@@ -161,7 +162,7 @@ Machine-readable artifacts:
 ## GitHub Action
 
 ```yaml
-- uses: guillaumevele/agent-proof-kit@v0.5.0
+- uses: guillaumevele/agent-proof-kit@v0.6.0
   with:
     input: examples/synthetic-agent-run.json
     policy: policies/default-policy.json
@@ -201,8 +202,37 @@ destructive, non-idempotent and never retries an uncertain state. See
 [docs/integrations/mcp.md](docs/integrations/mcp.md).
 
 The `npx` configuration above resolves the latest published package. Replace
-`agent-proof-kit` with `agent-proof-kit@0.5.0` when an immutable MCP dependency
+`agent-proof-kit` with `agent-proof-kit@0.6.0` when an immutable MCP dependency
 version is required.
+
+## Codex CLI
+
+Codex can route edits to protected files through ByteFence, and CI can gate the
+resulting `codex exec --json` trace:
+
+```toml
+# ~/.codex/config.toml
+[mcp_servers.agent_proof_kit]
+command = "npx"
+args = ["--yes", "--package", "agent-proof-kit@0.6.0", "agent-proof-mcp"]
+required = true
+enabled_tools = ["agent_proof_status", "bytefence_check", "bytefence_apply"]
+
+[mcp_servers.agent_proof_kit.env]
+AGENT_PROOF_ROOT = "/absolute/path/to/repository"
+```
+
+```bash
+codex exec --json "..." < /dev/null > codex-exec.jsonl
+agent-proof export --from codex-exec-jsonl --input codex-exec.jsonl --out codex-run.json
+agent-proof verify --input codex-run.json --policy policies/codex-bytefence-strict-policy.json
+```
+
+The strict policy fails any run where Codex reports a direct `file_change`
+instead of calling `bytefence_apply`. Start with the [Codex CLI integration guide](docs/integrations/codex.md),
+the copy-paste [AGENTS.md protocol](examples/codex/AGENTS.md) and the
+[end-to-end demo](examples/codex/run-demo.sh). The guide lists what is verified
+and what is not.
 
 ## Policy Surface
 
@@ -277,7 +307,7 @@ schemas/                           public JSON contracts
 src/core/evaluate-agent-run.js     deterministic policy engine
 src/core/diff-agent-runs.js        baseline/candidate regression diff
 src/core/normalize-jsonl.js        synthetic JSONL trace adapter
-src/core/trace-export.js           LangGraph, CrewAI, AutoGen and JSONL fixture export
+src/core/trace-export.js           LangGraph, CrewAI, AutoGen, Codex exec and JSONL trace export
 src/core/policy-loader.js          JSON/YAML policy loader and DSL compiler
 src/core/proof-signature.js        canonical proof-bundle digest and signature helpers
 src/core/public-safety-scan.js     repository surface scanner
@@ -288,6 +318,7 @@ src/report/                        Markdown, SARIF, proof-bundle and dashboard r
 examples/bytefence/                deterministic adversarial raw-byte corpus
 adapters/vibe/                     version-pinned Mistral Vibe 2.19.1 profile
 examples/adapters/                 synthetic framework trace shapes
+examples/codex/                    Codex CLI config, AGENTS.md protocol and end-to-end demo
 policies/                          JSON policy gates
 tests/                             unit, CLI, MCP, schema, adapter, diff, SARIF, signature, dashboard and pack tests
 docs/generated/                    reproducible proof artifacts
@@ -295,6 +326,7 @@ docs/threat-model.md               public threat model and release rule
 docs/signatures.md                 proof bundle digest and signature workflow
 docs/dashboard.md                  local HTML dashboard workflow
 docs/integrations/bytefence.md     ByteFence quickstart, guarantees and evidence
+docs/integrations/codex.md         Codex CLI MCP setup and exec trace gating
 ```
 
 ## ByteFence 0.5.0
@@ -311,6 +343,9 @@ current remote matrix.
 
 ## Roadmap
 
+- A recorded, model-driven Codex demo run checked in as evidence.
+- Protected-path coverage check: every `git diff` change to a protected path
+  must match a ByteFence receipt.
 - OpenTelemetry-shaped trace adapter.
 - GitHub pull-request comment, status badge and required-check examples.
 - Policy comparator and shared fixture registry.

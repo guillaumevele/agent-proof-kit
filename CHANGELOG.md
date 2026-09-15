@@ -8,6 +8,39 @@ and published releases follow semantic versioning.
 
 No unreleased changes.
 
+## [0.6.0] - 2026-09-16
+
+### Added
+
+- Added the `codex-exec-jsonl` trace source for `agent-proof export` and the
+  `agent_proof_export_trace` MCP tool. It normalizes the `codex exec --json`
+  event stream (Codex CLI 0.153 schema) into a non-synthetic agent run: shell
+  commands, direct file changes, MCP tool calls, web searches, collaboration
+  calls, agent messages and turn usage or failures. Reasoning text, command
+  output, MCP arguments and search queries are not exported.
+- `bytefence_apply` calls in a Codex trace become mediated `write` actions that
+  count as completed only for `status: "allow"`, `exitCode: 0` and a persisted
+  receipt; refused applies become `blocked`. Direct Codex patches become
+  `unmediated_write`, deletions `destructive`, and unrecognized item types fail
+  closed.
+- Added `policies/codex-exec-policy.json` and
+  `policies/codex-bytefence-strict-policy.json`; the strict policy fails any run
+  with a direct `file_change`.
+- Added the Codex CLI integration guide, a `config.toml` example checked with
+  `codex exec --strict-config`, a copy-paste `AGENTS.md` ByteFence edit protocol
+  and `examples/codex/run-demo.sh`, which verifies target bytes, the receipt and
+  the exported trace after a Codex run.
+- Added tests that drive real `bytefence_apply` MCP results through the Codex
+  adapter, plus edge cases for declined, failed, deleted, incomplete and
+  unrecognized items.
+- Added a code of conduct, CODEOWNERS and an issue-template chooser that routes
+  vulnerabilities to private reporting.
+
+### Changed
+
+- Bumped `@modelcontextprotocol/sdk` to 1.30.0, `zod` to 4.5.4 and the pinned
+  `actions/checkout`, `actions/setup-node` and `actions/setup-python` versions.
+
 ## [0.5.0] - 2026-07-13
 
 ### Added
@@ -134,7 +167,8 @@ No unreleased changes.
 
 - Established the initial public Agent Proof Kit repository and CI baseline.
 
-[Unreleased]: https://github.com/guillaumevele/agent-proof-kit/compare/v0.5.0...main
+[Unreleased]: https://github.com/guillaumevele/agent-proof-kit/compare/v0.6.0...main
+[0.6.0]: https://github.com/guillaumevele/agent-proof-kit/releases/tag/v0.6.0
 [0.5.0]: https://github.com/guillaumevele/agent-proof-kit/releases/tag/v0.5.0
 [0.4.1]: https://github.com/guillaumevele/agent-proof-kit/releases/tag/v0.4.1
 [0.4.0]: https://github.com/guillaumevele/agent-proof-kit/releases/tag/v0.4.0

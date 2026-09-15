@@ -4,14 +4,14 @@
   "subject": {
     "tool": {
       "name": "agent-proof-kit",
-      "version": "0.5.0"
+      "version": "0.6.0"
     },
     "status": "pass",
     "runId": "demo-agent-run-001"
   },
   "digest": {
     "algorithm": "sha256",
-    "value": "b2f0cb117663a116041d85e9c11e04cb477203b8fdea5bf324c0788b7a4f1a2c"
+    "value": "bd0e7f368c48127b6c8f9d1f6b9d939c85fa6dd4c6a25d7fa420ada18131ca2e"
   },
   "signature": null
 }

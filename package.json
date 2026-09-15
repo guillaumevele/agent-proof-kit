@@ -1,6 +1,6 @@
 {
   "name": "agent-proof-kit",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Deterministic release gates and raw-byte transaction receipts for AI agent writes.",
   "type": "module",
   "main": "./src/index.js",
@@ -65,6 +65,8 @@
     "in-toto",
     "mcp",
     "mistral-vibe",
+    "codex",
+    "openai-codex",
     "synthetic-data"
   ],
   "author": "Guillaume Vele",

@@ -1,0 +1,26 @@
+# Agent Proof Kit MCP server for Codex CLI.
+# Merge this table into ~/.codex/config.toml or a project .codex/config.toml.
+# Replace AGENT_PROOF_ROOT with the absolute path of the repository Codex edits.
+
+[mcp_servers.agent_proof_kit]
+command = "npx"
+args = ["--yes", "--package", "agent-proof-kit@0.6.0", "agent-proof-mcp"]
+startup_timeout_sec = 30
+# Fail the Codex session instead of continuing without the ByteFence tools.
+required = true
+# Only expose the ByteFence tools and the status probe to the model.
+enabled_tools = ["agent_proof_status", "bytefence_check", "bytefence_apply"]
+
+[mcp_servers.agent_proof_kit.env]
+AGENT_PROOF_ROOT = "/absolute/path/to/repository"
+
+# `codex exec` cannot ask a human. Pre-approve the two read-only tools and
+# decide explicitly whether bytefence_apply may run without a prompt.
+[mcp_servers.agent_proof_kit.tools.agent_proof_status]
+approval_mode = "approve"
+
+[mcp_servers.agent_proof_kit.tools.bytefence_check]
+approval_mode = "approve"
+
+[mcp_servers.agent_proof_kit.tools.bytefence_apply]
+approval_mode = "approve"

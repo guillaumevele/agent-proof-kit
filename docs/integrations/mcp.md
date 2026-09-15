@@ -24,7 +24,7 @@ npm install --save-dev agent-proof-kit
 ```
 
 That command resolves the latest published package. Pin
-`agent-proof-kit@0.5.0` when the ByteFence MCP contract must not move with the
+`agent-proof-kit@0.6.0` when the ByteFence MCP contract must not move with the
 `latest` dist-tag.
 
 For local development from this repository:
@@ -35,6 +35,12 @@ node bin/agent-proof-mcp.js
 
 Do not run the server directly in a normal terminal unless you expect it to wait on stdio. MCP clients
 spawn it as a subprocess.
+
+## Codex CLI Example
+
+See [Codex CLI integration](codex.md) for a strict-config-checked
+`config.toml`, an `AGENTS.md` edit protocol and CI gating of `codex exec --json`
+traces.
 
 ## Claude Desktop Example
 

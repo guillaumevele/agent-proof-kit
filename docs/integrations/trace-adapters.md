@@ -29,6 +29,7 @@ Supported `--from` values:
 | `langgraph-stream` | Stable fixture adapter | Normalizes LangGraph `stream()` update chunks shaped as node-name to update payload objects. |
 | `crewai-events` | Stable fixture adapter | Normalizes CrewAI event-listener records such as crew kickoff, agent execution completed and crew completion events. |
 | `autogen-run-stream` | Stable fixture adapter | Normalizes Microsoft AutoGen `run_stream()` messages and final `TaskResult` records. |
+| `codex-exec-jsonl` | New in 0.6.0 | Normalizes the `codex exec --json` event stream. Produces non-synthetic runs; use `policies/codex-exec-policy.json` or `policies/codex-bytefence-strict-policy.json`. See [Codex CLI integration](codex.md). |
 
 The exporter is synthetic-first. It does not promise to sanitize arbitrary production logs by itself; pass known private terms through `--redact-terms`, review the output, and run `agent-proof scan` before committing a fixture.
 

@@ -6,7 +6,10 @@ The default branch is the supported development line.
 
 ## Reporting a Vulnerability
 
-Please open a private vulnerability report through GitHub Security Advisories if available. If not, open a minimal issue that describes the affected area without posting secrets or exploit material.
+Please use [private vulnerability reporting](https://github.com/guillaumevele/agent-proof-kit/security/advisories/new).
+Do not open a public issue for a vulnerability. Expect an acknowledgement within
+seven days. ByteFence path confinement, receipt verification and the MCP
+workspace boundary are in scope; see the [threat model](docs/threat-model.md).
 
 ## Public Data Boundary
 

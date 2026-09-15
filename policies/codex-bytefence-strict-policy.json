@@ -1,0 +1,33 @@
+{
+  "id": "codex-bytefence-strict-policy",
+  "schemaVersion": 1,
+  "minimumScore": 90,
+  "maxScannedFileBytes": 512000,
+  "severityWeights": {
+    "critical": 35,
+    "high": 20,
+    "medium": 10,
+    "low": 3
+  },
+  "gates": {
+    "requireSyntheticFixture": false,
+    "requireDecisionTrace": true,
+    "requireEvidenceForClaims": true,
+    "requireClaimsForFinalOutputs": true,
+    "maxCriticalFindings": 0,
+    "maxHighFindings": 0
+  },
+  "privateTerms": [],
+  "actionRisk": {
+    "read": "low",
+    "mcp_tool": "low",
+    "command": "medium",
+    "write": "medium",
+    "unmediated_write": "high",
+    "subagent": "medium",
+    "network": "high",
+    "destructive": "critical",
+    "secret_exposure": "critical",
+    "professional_advice": "high"
+  }
+}
