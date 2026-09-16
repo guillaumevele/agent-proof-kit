@@ -20,6 +20,7 @@ Both paths are local. The kit never calls a model provider; only Codex does.
 | Codex starts the MCP server from that configuration | With `required = true` pointing at `bin/agent-proof-mcp.js`, Codex CLI 0.153.4 completed the MCP handshake and started the thread; the same configuration with a broken server path aborted with `required MCP servers failed to initialize`. |
 | The trace adapter matches the `codex exec --json` schema | Written against `codex-rs/exec/src/exec_events.rs` at tag `rust-v0.153.4`; the stream envelope (`thread.started`, `turn.started`, `item.completed`, `error`, `turn.failed`) was also observed from a real Codex CLI 0.153.4 run. |
 | The adapter understands real `bytefence_apply` results | `tests/adapter/codex-exec.test.js` starts the MCP server, performs committed and refused applies, wraps the real tool results in Codex `mcp_tool_call` items and gates them. |
+| `agent-proof init --agent codex` guard hook blocks `apply_patch` and shell writes to protected paths | Hook payload and decision handling follow `codex-rs/hooks` at `rust-v0.153.4` (`tool_input.command` carries the raw patch; exit 2 with a stderr reason blocks). Unit tests cover the decisions. Not yet exercised with a live Codex model run. |
 | `examples/codex/run-demo.sh` checks target bytes, receipt and trace | The script's verification chain is exercised with a Codex stand-in. A recorded model-driven run is not yet checked in. |
 
 Not claimed: that a given model always follows the `AGENTS.md` protocol, that
@@ -34,7 +35,7 @@ Merge [examples/codex/config.toml](../../examples/codex/config.toml) into
 ```toml
 [mcp_servers.agent_proof_kit]
 command = "npx"
-args = ["--yes", "--package", "agent-proof-kit@0.6.0", "agent-proof-mcp"]
+args = ["--yes", "--package", "agent-proof-kit@0.7.0", "agent-proof-mcp"]
 startup_timeout_sec = 30
 required = true
 enabled_tools = ["agent_proof_status", "bytefence_check", "bytefence_apply"]
@@ -73,10 +74,22 @@ Two details matter in practice and are spelled out in the protocol:
 - The default policy denies an `oldText` larger than 25% of the file, so a
   one-line change in a tiny file needs the smallest unique `oldText`.
 
+## 2b. Block direct edits with the guard hook
+
+`npx agent-proof-kit init --agent codex --protect "<paths>"` writes the MCP server,
+the `AGENTS.md` protocol and a project `.codex/hooks.json` with a `PreToolUse`
+guard on `apply_patch|Bash|mcp__.*`. Trust the hook once with `/hooks`; Codex
+skips untrusted project hooks, including under `codex exec`. See
+[Agent Guard](guard.md) for the rules and limits.
+
+Hook enforcement in Codex has been reported as inconsistent across versions and
+platforms ([openai/codex#27833](https://github.com/openai/codex/issues/27833)).
+Keep the strict CI gate below even when the hook is installed.
+
 ## 3. Gate the run in CI
 
 ```bash
-npm install --save-dev agent-proof-kit@0.6.0
+npm install --save-dev agent-proof-kit@0.7.0
 codex exec --json "..." < /dev/null > codex-exec.jsonl
 npx agent-proof export --from codex-exec-jsonl --input codex-exec.jsonl --out codex-run.json
 npx agent-proof verify --input codex-run.json \

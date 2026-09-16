@@ -8,6 +8,38 @@ and published releases follow semantic versioning.
 
 No unreleased changes.
 
+## [0.7.0] - 2026-09-16
+
+### Added
+
+- Added `agent-proof init --agent codex|claude|all --protect <patterns>`. It
+  writes or merges the protected-path list, the ByteFence policy and folders,
+  the edit protocol in `AGENTS.md`/`CLAUDE.md`, the project MCP server
+  (`.codex/config.toml`, `.mcp.json`) and a `PreToolUse` guard hook
+  (`.codex/hooks.json`, `.claude/settings.json`). It is idempotent, keeps
+  existing settings and supports `--dry-run` and `--force`.
+- Added `agent-proof guard`, a `PreToolUse` hook for Claude Code and Codex CLI.
+  It blocks direct writes to protected paths from `Edit`, `Write`,
+  `MultiEdit`, `NotebookEdit`, Codex `apply_patch` (patch headers, resolved from
+  the hook `cwd`), write-capable shell commands that name a protected path, and
+  write-like MCP tools. It always protects its own configuration and ByteFence
+  receipts, fails closed on invalid configuration or unparseable input, and is a
+  no-op in workspaces without `.agent-proof/protected.json`.
+- In an initialized workspace, `bytefence_apply` refuses intents that target
+  guard control files and requires `policy_path: ".bytefence/policy.json"`.
+- The MCP server finds the initialized workspace root from a subdirectory when
+  `AGENT_PROOF_ROOT` is not set.
+- Added the `agent-proof-kit` bin alias so `npx agent-proof-kit init` works.
+- Added the Agent Guard guide, a recorded Claude Code evidence note and a demo
+  GIF built from that run.
+
+### Changed
+
+- Rewrote the top of the README around the guard, the mediated edit path and
+  what the kit does not do.
+- `agent-proof --version` and `agent-proof version` print the package version
+  (#19, thanks @Akzrozen).
+
 ## [0.6.0] - 2026-09-16
 
 ### Added
@@ -167,7 +199,8 @@ No unreleased changes.
 
 - Established the initial public Agent Proof Kit repository and CI baseline.
 
-[Unreleased]: https://github.com/guillaumevele/agent-proof-kit/compare/v0.6.0...main
+[Unreleased]: https://github.com/guillaumevele/agent-proof-kit/compare/v0.7.0...main
+[0.7.0]: https://github.com/guillaumevele/agent-proof-kit/releases/tag/v0.7.0
 [0.6.0]: https://github.com/guillaumevele/agent-proof-kit/releases/tag/v0.6.0
 [0.5.0]: https://github.com/guillaumevele/agent-proof-kit/releases/tag/v0.5.0
 [0.4.1]: https://github.com/guillaumevele/agent-proof-kit/releases/tag/v0.4.1

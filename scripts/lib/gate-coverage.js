@@ -1,5 +1,23 @@
 export const gateCoverageEntries = [
   {
+    gate: "Agent guard and init",
+    evidence: [
+      "src/core/guard.js",
+      "src/core/init.js",
+      "src/core/project-root.js",
+      "docs/integrations/guard.md",
+      "docs/evidence/claude-code-guard.md"
+    ],
+    verification: [
+      "tests/guard/guard.test.js",
+      "tests/guard/init.test.js",
+      "tests/mcp/guard-mcp.test.js"
+    ],
+    artifacts: [
+      "docs/generated/gate-coverage.md"
+    ]
+  },
+  {
     gate: "Public JSON contracts",
     evidence: [
       "schemas/agent-run.schema.json",

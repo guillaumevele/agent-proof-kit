@@ -1,0 +1,27 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.guillaumevele/agent-proof-kit",
+  "description": "Exact raw-byte edits with verifiable receipts, plus a guard for Claude Code and Codex.",
+  "repository": {
+    "url": "https://github.com/guillaumevele/agent-proof-kit",
+    "source": "github"
+  },
+  "version": "0.7.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "agent-proof-kit",
+      "version": "0.7.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "AGENT_PROOF_ROOT",
+          "description": "Workspace root. Defaults to the nearest directory initialized with agent-proof init, then the working directory.",
+          "isRequired": false
+        }
+      ]
+    }
+  ]
+}

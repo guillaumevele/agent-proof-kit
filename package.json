@@ -1,12 +1,14 @@
 {
   "name": "agent-proof-kit",
-  "version": "0.6.0",
-  "description": "Deterministic release gates and raw-byte transaction receipts for AI agent writes.",
+  "version": "0.7.0",
+  "description": "Stop coding agents from silently rewriting protected files: a PreToolUse guard for Claude Code and Codex, exact raw-byte edits over MCP, and verifiable receipts.",
+  "mcpName": "io.github.guillaumevele/agent-proof-kit",
   "type": "module",
   "main": "./src/index.js",
   "private": false,
   "bin": {
     "agent-proof": "bin/agent-proof.js",
+    "agent-proof-kit": "bin/agent-proof.js",
     "agent-proof-mcp": "bin/agent-proof-mcp.js"
   },
   "files": [
@@ -31,6 +33,7 @@
     "test:sarif": "node --test tests/sarif/*.test.js",
     "test:cli": "node --test tests/cli/*.test.js",
     "test:mcp": "node --test tests/mcp/*.test.js",
+    "test:guard": "node --test tests/guard/*.test.js",
     "test:signature": "node --test tests/signature/*.test.js",
     "test:dashboard": "node --test tests/dashboard/*.test.js",
     "test:pack": "node --test tests/pack/*.test.js",
@@ -46,7 +49,7 @@
     "bytefence:benchmark": "node scripts/bytefence/benchmark.js",
     "bytefence:reproduce-vibe": "node scripts/bytefence/reproduce-vibe-mixed-eol.js",
     "refresh": "npm run report:generate && npm run artifacts:generate && npm run coverage:generate",
-    "verify": "npm run test:unit && npm run test:schema && npm run test:bytefence && npm run test:adapter && npm run test:diff && npm run test:sarif && npm run test:cli && npm run test:mcp && npm run test:signature && npm run test:dashboard && npm run test:pack && npm run report:verify && npm run artifacts:verify && npm run coverage:verify && npm run scan:leaks && npm run scan:generated"
+    "verify": "npm run test:unit && npm run test:schema && npm run test:bytefence && npm run test:adapter && npm run test:diff && npm run test:sarif && npm run test:cli && npm run test:mcp && npm run test:guard && npm run test:signature && npm run test:dashboard && npm run test:pack && npm run report:verify && npm run artifacts:verify && npm run coverage:verify && npm run scan:leaks && npm run scan:generated"
   },
   "engines": {
     "node": ">=22"
@@ -67,7 +70,10 @@
     "mistral-vibe",
     "codex",
     "openai-codex",
-    "synthetic-data"
+    "synthetic-data",
+    "claude-code",
+    "hooks",
+    "guardrails"
   ],
   "author": "Guillaume Vele",
   "license": "MIT",

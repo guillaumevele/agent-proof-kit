@@ -15,7 +15,7 @@ import {
   unlinkSync,
   writeFileSync
 } from "node:fs";
-import { dirname, relative, resolve, sep } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -31,6 +31,8 @@ import { evaluateByteFence } from "../src/core/bytefence-evaluate.js";
 import { inspectByteFenceTarget, readByteFenceTarget } from "../src/core/bytefence-path.js";
 import { receiptDigest as digestByteFenceReceipt } from "../src/core/bytefence-receipt.js";
 import { diffAgentRuns } from "../src/core/diff-agent-runs.js";
+import { isGuardControlPath } from "../src/core/guard.js";
+import { PROTECTED_CONFIG_PATH, findAgentProofRoot } from "../src/core/project-root.js";
 import { evaluateAgentRun } from "../src/core/evaluate-agent-run.js";
 import { compilePolicyDefinition, loadPolicyFile, readPolicyDefinition } from "../src/core/policy-loader.js";
 import { createProofAttestation, verifyProofAttestation } from "../src/core/proof-signature.js";
@@ -42,7 +44,11 @@ import { renderProofDashboard } from "../src/report/dashboard.js";
 import { renderSarif } from "../src/report/sarif-report.js";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const workspaceRoot = realpathSync(resolve(process.env.AGENT_PROOF_ROOT ?? process.cwd()));
+const workspaceRoot = realpathSync(resolve(
+  process.env.AGENT_PROOF_ROOT ?? findAgentProofRoot(process.cwd()) ?? process.cwd()
+));
+const GUARDED_POLICY_PATH = ".bytefence/policy.json";
+const guardInitialized = existsSync(join(workspaceRoot, PROTECTED_CONFIG_PATH));
 const CHARACTER_LIMIT = 25000;
 
 const ResponseFormat = {
@@ -229,6 +235,7 @@ This tool owns the mediated write. It calls the transaction engine exactly once 
       intent_path,
       BYTEFENCE_MAX_INTENT_BYTES
     ).bytes;
+    assertGuardAllowsApply(intentBytes, policy_path);
     const policyBytes = readByteFenceWorkspaceFile(
       policy_path,
       BYTEFENCE_MAX_POLICY_BYTES
@@ -813,6 +820,29 @@ function readByteFenceWorkspaceFile(relativePath, maxBytes) {
     targetPath: relativePath
   });
   return readByteFenceTarget(target, { maxBytes });
+}
+
+// When `agent-proof init` protected this workspace, the mediated path must not
+// be usable to rewrite the protection itself or to swap in a looser policy.
+function assertGuardAllowsApply(intentBytes, policyPath) {
+  if (!guardInitialized) return;
+  if (normalizeWorkspaceRelative(policyPath) !== GUARDED_POLICY_PATH) {
+    throw new Error(`This workspace is protected by agent-proof init: policy_path must be ${GUARDED_POLICY_PATH}.`);
+  }
+  let intent;
+  try {
+    intent = parseByteFenceIntent(intentBytes);
+  } catch {
+    return; // The transaction engine reports contract errors with finding codes.
+  }
+  const target = normalizeWorkspaceRelative(intent.targetPath);
+  if (isGuardControlPath(target)) {
+    throw new Error(`${target} is agent-proof guard configuration or evidence and cannot be changed through bytefence_apply. A human must change it outside the agent.`);
+  }
+}
+
+function normalizeWorkspaceRelative(path) {
+  return String(path).replace(/\\/g, "/").replace(/^(\.\/)+/, "");
 }
 
 function summarizeByteFenceResult(result, extra = {}) {

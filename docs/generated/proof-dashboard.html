@@ -117,16 +117,16 @@
   <main>
     <header>
       <h1>Agent Proof Dashboard</h1>
-      <div class="meta">Synthetic release assistant trial · agent-proof-kit 0.6.0</div>
+      <div class="meta">Synthetic release assistant trial · agent-proof-kit 0.7.0</div>
     </header>
 
     <div class="grid">
       <div class="metric"><div class="label">Status</div><div class="value status-pass">PASS</div></div>
       <div class="metric"><div class="label">Score</div><div class="value ">100</div></div>
       <div class="metric"><div class="label">Run</div><div class="value ">demo-agent-run-001</div></div>
-      <div class="metric"><div class="label">Files scanned</div><div class="value ">167</div></div>
+      <div class="metric"><div class="label">Files scanned</div><div class="value ">176</div></div>
       <div class="metric"><div class="label">Findings</div><div class="value ">0</div></div>
-      <div class="metric"><div class="label">Digest</div><div class="value ">bd0e7f368c48</div></div>
+      <div class="metric"><div class="label">Digest</div><div class="value ">8547fd8664d2</div></div>
     </div>
 
     <section>
@@ -149,7 +149,7 @@
       <table>
         <tbody>
           <tr><th>Digest algorithm</th><td>sha256</td></tr>
-          <tr><th>Digest value</th><td><code>bd0e7f368c48127b6c8f9d1f6b9d939c85fa6dd4c6a25d7fa420ada18131ca2e</code></td></tr>
+          <tr><th>Digest value</th><td><code>8547fd8664d2b5191817f100f7354ec6a83f9543a47ad70a0378725c6e29239c</code></td></tr>
           <tr><th>Signature</th><td>not present</td></tr>
         </tbody>
       </table>
@@ -165,6 +165,7 @@ Scope note: this matrix proves repository coverage for public claims. It does no
 
 | Gate | Implementation evidence | Verification | Generated proof |
 | --- | --- | --- | --- |
+| Agent guard and init | [src/core/guard.js](../../src/core/guard.js)&lt;br&gt;[src/core/init.js](../../src/core/init.js)&lt;br&gt;[src/core/project-root.js](../../src/core/project-root.js)&lt;br&gt;[docs/integrations/guard.md](../../docs/integrations/guard.md)&lt;br&gt;[docs/evidence/claude-code-guard.md](../../docs/evidence/claude-code-guard.md) | [tests/guard/guard.test.js](../../tests/guard/guard.test.js)&lt;br&gt;[tests/guard/init.test.js](../../tests/guard/init.test.js)&lt;br&gt;[tests/mcp/guard-mcp.test.js](../../tests/mcp/guard-mcp.test.js) | [docs/generated/gate-coverage.md](../../docs/generated/gate-coverage.md) |
 | Public JSON contracts | [schemas/agent-run.schema.json](../../schemas/agent-run.schema.json)&lt;br&gt;[schemas/policy.schema.json](../../schemas/policy.schema.json)&lt;br&gt;[src/core/json-schema-validator.js](../../src/core/json-schema-validator.js) | [tests/schema/schema.test.js](../../tests/schema/schema.test.js)&lt;br&gt;[.github/workflows/verify.yml](../../.github/workflows/verify.yml) | [docs/spec.md](../../docs/spec.md)&lt;br&gt;[docs/generated/proof-bundle.json](../../docs/generated/proof-bundle.json) |
 | Versioned policy packs | [policies/default-policy.json](../../policies/default-policy.json)&lt;br&gt;[policies/open-source-policy.json](../../policies/open-source-policy.json)&lt;br&gt;[policies/strict-corporate-policy.json](../../policies/strict-corporate-policy.json)&lt;br&gt;[policies/high-stakes-policy.json](../../policies/high-stakes-policy.json)&lt;br&gt;[examples/policies/strict-corporate-policy.yaml](../../examples/policies/strict-corporate-policy.yaml)&lt;br&gt;[src/core/policy-loader.js](../../src/core/policy-loader.js)&lt;br&gt;[docs/policy-packs.md](../../docs/policy-packs.md) | [tests/schema/schema.test.js](../../tests/schema/schema.test.js)&lt;br&gt;[tests/cli/cli.test.js](../../tests/cli/cli.test.js) | [docs/generated/gate-coverage.md](../../docs/generated/gate-coverage.md) |
 | Runtime schema validation | [src/core/validate-agent-run.js](../../src/core/validate-agent-run.js)&lt;br&gt;[src/core/evaluate-agent-run.js](../../src/core/evaluate-agent-run.js) | [tests/schema/schema.test.js](../../tests/schema/schema.test.js)&lt;br&gt;[tests/unit/evaluate-agent-run.test.js](../../tests/unit/evaluate-agent-run.test.js) | [docs/generated/sample-agent-proof-report.md](../../docs/generated/sample-agent-proof-report.md) |

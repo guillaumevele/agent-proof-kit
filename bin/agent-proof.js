@@ -44,6 +44,9 @@ import { normalizeJsonlTrace } from "../src/core/normalize-jsonl.js";
 import { compilePolicyDefinition, loadPolicyFile, readPolicyDefinition } from "../src/core/policy-loader.js";
 import { createProofAttestation, verifyProofAttestation } from "../src/core/proof-signature.js";
 import { exportTraceFixture, supportedTraceSources } from "../src/core/trace-export.js";
+import { GuardConfigError, denialMessage, evaluateGuard, loadGuardConfig } from "../src/core/guard.js";
+import { applyInitPlan, planInit, renderInitSummary } from "../src/core/init.js";
+import { findAgentProofRoot } from "../src/core/project-root.js";
 import { scanPublicSurface } from "../src/core/public-safety-scan.js";
 import { validateAgentRun, validatePolicy } from "../src/core/validate-agent-run.js";
 import { renderAgentProofReport, renderScanReport } from "../src/report/markdown-report.js";
@@ -108,6 +111,8 @@ Commands:
   compile-policy --input <yaml|json> [--out <file>]
   normalize --input <jsonl> [--out <file>]
   adapt     --input <jsonl> [--out <file>]
+  init      --agent codex|claude|all --protect <path,glob,...> [--root <dir>] [--shell block-writes|off] [--dry-run] [--force]
+  guard     [--root <dir>] [--explain]   (PreToolUse hook: reads the hook JSON on stdin, exits 2 to block)
   export    --from <source> --input <jsonl> [--redact-terms <term,term>] [--out <file>]
   diff      --base <file> --candidate <file> --policy <file> [--format text|json|markdown|sarif] [--out <file>]
   bundle    --input <file> --policy <file> --scan-path <dir> --out <file>
@@ -121,6 +126,7 @@ Commands:
   bytefence-apply --intent <file> --policy <file> --workspace-id <id> --root <dir> --out <fresh-file> [--receipt-profile public|local] [--observed-at <UTC>]
 
 Examples:
+  agent-proof init --agent all --protect "src/config.js,.github/workflows/**"
   agent-proof verify --input examples/synthetic-agent-run.json --policy policies/default-policy.json
   agent-proof scan --path . --policy policies/default-policy.json
   agent-proof compile-policy --input examples/policies/strict-corporate-policy.yaml --out compiled-policy.json
@@ -236,6 +242,26 @@ export async function main(argv = process.argv.slice(2), io = process) {
 
   if (flags.version || command === "version") {
     io.stdout.write(`${packageVersion()}\n`);
+    return 0;
+  }
+
+  if (command === "guard") {
+    return runGuard(flags, io);
+  }
+
+  if (command === "init") {
+    const root = resolve(String(flags.root ?? "."));
+    const protect = splitList(requireFlag(flags, "protect"));
+    const plan = planInit({
+      root,
+      agents: splitList(requireFlag(flags, "agent")),
+      protect,
+      shell: flags.shell ? String(flags.shell) : undefined,
+      force: flags.force === true
+    });
+    const dryRun = flags["dry-run"] === true;
+    if (!dryRun) applyInitPlan(plan);
+    io.stdout.write(renderInitSummary(plan, { dryRun }));
     return 0;
   }
 
@@ -426,6 +452,68 @@ export async function main(argv = process.argv.slice(2), io = process) {
 }
 
 export { rootDir };
+
+// PreToolUse hook entry point for Claude Code and Codex CLI. Exit 0 lets the
+// tool call proceed; exit 2 with a reason on stderr blocks it in both hosts.
+async function runGuard(flags, io) {
+  const raw = await readStdin(io.stdin ?? process.stdin, 4 * 1024 * 1024);
+  let payload = null;
+  let parseError = null;
+  try {
+    payload = raw.trim() ? JSON.parse(raw) : null;
+  } catch (error) {
+    parseError = error;
+  }
+
+  const start = flags.root ? String(flags.root) : typeof payload?.cwd === "string" && payload.cwd ? payload.cwd : process.cwd();
+  const root = flags.root ? resolve(String(flags.root)) : findAgentProofRoot(start);
+  if (!root) return 0; // Workspace not initialized: nothing to guard.
+
+  const block = (message) => {
+    (io.stderr ?? process.stderr).write(`${message}\n`);
+    return 2;
+  };
+
+  let config;
+  try {
+    config = loadGuardConfig(root);
+  } catch (error) {
+    if (error instanceof GuardConfigError) return block(`agent-proof guard: ${error.message}. Blocking until a human fixes it.`);
+    throw error;
+  }
+  if (!config) return 0;
+  if (parseError || !payload || typeof payload !== "object") {
+    return block("agent-proof guard: hook input was not a JSON object; blocking because the target files cannot be determined.");
+  }
+
+  const result = evaluateGuard(payload, { root, config });
+  if (flags.explain) {
+    io.stdout.write(`${JSON.stringify(result)}\n`);
+  }
+  return result.decision === "deny" ? block(denialMessage(result)) : 0;
+}
+
+function readStdin(stream, limit) {
+  return new Promise((resolvePromise, reject) => {
+    if (stream.isTTY) {
+      resolvePromise("");
+      return;
+    }
+    const chunks = [];
+    let size = 0;
+    stream.on("data", (chunk) => {
+      size += chunk.length;
+      if (size > limit) {
+        stream.destroy();
+        reject(new Error("hook input exceeds 4 MiB"));
+        return;
+      }
+      chunks.push(chunk);
+    });
+    stream.on("end", () => resolvePromise(Buffer.concat(chunks).toString("utf8")));
+    stream.on("error", reject);
+  });
+}
 
 function splitList(value) {
   if (!value) return [];
