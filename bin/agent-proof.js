@@ -234,6 +234,11 @@ ${rows}
 export async function main(argv = process.argv.slice(2), io = process) {
   const { command, flags } = parseArgs(argv);
 
+  if (flags.version || command === "version") {
+    io.stdout.write(`${packageVersion()}\n`);
+    return 0;
+  }
+
   if (flags.help || command === "help") {
     io.stdout.write(usage());
     return 0;

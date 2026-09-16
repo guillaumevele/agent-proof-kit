@@ -14,6 +14,14 @@ test("prints help", () => {
   assert.match(result.stdout, /Deterministic release gates/);
 });
 
+test("prints the package version", () => {
+  for (const args of [["--version"], ["version"]]) {
+    const result = runCli(args);
+    assert.equal(result.status, 0);
+    assert.equal(result.stdout, `${packageVersion}\n`);
+  }
+});
+
 test("verifies the safe fixture", () => {
   const result = runCli([
     "verify",
