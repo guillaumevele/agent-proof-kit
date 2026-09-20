@@ -76,9 +76,17 @@ and Codex feed back to the model.
 
 ## Limits
 
-- The shell rule is a heuristic. A command that writes a protected file without
-  naming it (a script file, a variable, `find -exec` on a parent directory) can
-  pass. Pair the guard with the strict CI gate and review.
+- The shell rule is a heuristic, in both directions. A command that writes a
+  protected file without naming it (a script file, a variable, `find -exec` on a
+  parent directory) can pass. In the other direction, a read-only command that
+  names a protected path and uses a construct treated as write-capable is
+  blocked: in a recorded Codex run, a verification command using
+  `node --input-type=module -e` on the protected file was refused. Pair the
+  guard with the strict CI gate, and set `"shell": "off"` if the false positives
+  cost more than the coverage.
+- Whether a host enforces a hook denial is the host's business, not the guard's.
+  `scripts/codex/hook-conformance.sh` measures it for Codex; results for macOS
+  are in [the evidence note](../evidence/codex-live-run.md).
 - Hooks run only where the host runs them: untrusted Codex hooks, disabled
   hooks, or an agent started outside the repository are not covered.
 - The guard does not sandbox processes or network access.

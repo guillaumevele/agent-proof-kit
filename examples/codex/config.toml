@@ -4,7 +4,7 @@
 
 [mcp_servers.agent_proof_kit]
 command = "npx"
-args = ["--yes", "--package", "agent-proof-kit@0.7.0", "agent-proof-mcp"]
+args = ["--yes", "--package", "agent-proof-kit@0.8.0", "agent-proof-mcp"]
 startup_timeout_sec = 30
 # Fail the Codex session instead of continuing without the ByteFence tools.
 required = true

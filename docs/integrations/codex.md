@@ -20,8 +20,9 @@ Both paths are local. The kit never calls a model provider; only Codex does.
 | Codex starts the MCP server from that configuration | With `required = true` pointing at `bin/agent-proof-mcp.js`, Codex CLI 0.153.4 completed the MCP handshake and started the thread; the same configuration with a broken server path aborted with `required MCP servers failed to initialize`. |
 | The trace adapter matches the `codex exec --json` schema | Written against `codex-rs/exec/src/exec_events.rs` at tag `rust-v0.153.4`; the stream envelope (`thread.started`, `turn.started`, `item.completed`, `error`, `turn.failed`) was also observed from a real Codex CLI 0.153.4 run. |
 | The adapter understands real `bytefence_apply` results | `tests/adapter/codex-exec.test.js` starts the MCP server, performs committed and refused applies, wraps the real tool results in Codex `mcp_tool_call` items and gates them. |
-| `agent-proof init --agent codex` guard hook blocks `apply_patch` and shell writes to protected paths | Hook payload and decision handling follow `codex-rs/hooks` at `rust-v0.153.4` (`tool_input.command` carries the raw patch; exit 2 with a stderr reason blocks). Unit tests cover the decisions. Not yet exercised with a live Codex model run. |
-| `examples/codex/run-demo.sh` checks target bytes, receipt and trace | The script's verification chain is exercised with a Codex stand-in. A recorded model-driven run is not yet checked in. |
+| `agent-proof init --agent codex` guard hook blocks `apply_patch` and shell writes to protected paths | Verified with a live Codex CLI 0.153.4 run: a direct `apply_patch` on a protected file was blocked and the file stayed byte-identical; the normal request went through `bytefence_apply` ([evidence](../evidence/codex-live-run.md)). |
+| `examples/codex/run-demo.sh` checks target bytes, receipt and trace | Run with a live model on 2026-09-20: target matched the authorized candidate, receipt `verified`, exported trace passed the strict policy ([evidence](../evidence/codex-live-run.md)). |
+| Codex enforces a `PreToolUse` deny | `scripts/codex/hook-conformance.sh` measured 8/8 enforced on macOS for `apply_patch` and `Bash`, both deny channels, on Codex CLI 0.153.4 and 0.155.1. Reports of non-enforcement on other platforms remain open in [openai/codex#27833](https://github.com/openai/codex/issues/27833). |
 
 Not claimed: that a given model always follows the `AGENTS.md` protocol, that
 the MCP process is sandboxed, or that shell commands cannot write files.
@@ -35,7 +36,7 @@ Merge [examples/codex/config.toml](../../examples/codex/config.toml) into
 ```toml
 [mcp_servers.agent_proof_kit]
 command = "npx"
-args = ["--yes", "--package", "agent-proof-kit@0.7.0", "agent-proof-mcp"]
+args = ["--yes", "--package", "agent-proof-kit@0.8.0", "agent-proof-mcp"]
 startup_timeout_sec = 30
 required = true
 enabled_tools = ["agent_proof_status", "bytefence_check", "bytefence_apply"]
@@ -84,12 +85,22 @@ skips untrusted project hooks, including under `codex exec`. See
 
 Hook enforcement in Codex has been reported as inconsistent across versions and
 platforms ([openai/codex#27833](https://github.com/openai/codex/issues/27833)).
-Keep the strict CI gate below even when the hook is installed.
+Measure it where you run Codex before relying on it:
+
+```bash
+CODEX_MODEL=<model> scripts/codex/hook-conformance.sh
+```
+
+The script installs an unconditional deny hook in a throwaway workspace, asks
+Codex to change one line through `apply_patch` and through the shell, and
+compares the file digest before and after for both documented deny channels. On
+macOS with 0.153.4 and 0.155.1 all eight cases were enforced. Keep the strict CI
+gate below in any case: it catches what a hook cannot.
 
 ## 3. Gate the run in CI
 
 ```bash
-npm install --save-dev agent-proof-kit@0.7.0
+npm install --save-dev agent-proof-kit@0.8.0
 codex exec --json "..." < /dev/null > codex-exec.jsonl
 npx agent-proof export --from codex-exec-jsonl --input codex-exec.jsonl --out codex-run.json
 npx agent-proof verify --input codex-run.json \
@@ -104,6 +115,7 @@ The adapter maps Codex items as follows:
 | --- | --- | --- |
 | `command_execution` | `command` | Command text only. Output is not exported; risk is not inferred from the command. `declined` becomes `refused`. |
 | `file_change` (`add`, `update`) | `unmediated_write` | One action per changed path. |
+| `file_change` writing under `.bytefence/intents/` | `bytefence_intent` | Low risk: the intent is an input of the mediated path, not a target write. |
 | `file_change` (`delete`) | `destructive` | Critical in every bundled policy unless approved. |
 | `mcp_tool_call` `bytefence_apply` | `write` | `completed` only for `status: "allow"`, `exitCode: 0` and a persisted receipt; refused applies become `blocked`. |
 | `mcp_tool_call` `bytefence_check` | `read` | |

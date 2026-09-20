@@ -23,6 +23,7 @@
     "mcp_tool": "low",
     "command": "medium",
     "write": "medium",
+    "bytefence_intent": "low",
     "unmediated_write": "medium",
     "subagent": "medium",
     "network": "high",

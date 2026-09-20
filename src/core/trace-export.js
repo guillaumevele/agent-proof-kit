@@ -374,13 +374,16 @@ function addCodexItem(run, item, counters, phase) {
     for (const change of changes) {
       counters.patch += 1;
       const actionId = `codex-file-change-${counters.patch}`;
+      const intentWrite = change?.kind !== "delete" && isByteFenceIntentPath(change?.path);
       run.actions.push({
         id: actionId,
-        type: change?.kind === "delete" ? "destructive" : "unmediated_write",
+        type: change?.kind === "delete" ? "destructive" : intentWrite ? "bytefence_intent" : "unmediated_write",
         target: String(change?.path ?? "unknown path"),
         approval: "not_recorded",
         outcome: statusOutcome(item.status),
-        note: `Codex patch (${change?.kind ?? "unknown"}) applied outside ByteFence mediation.`
+        note: intentWrite
+          ? `Codex patch (${change?.kind ?? "unknown"}) writing a ByteFence intent, an input of the mediated path.`
+          : `Codex patch (${change?.kind ?? "unknown"}) applied outside ByteFence mediation.`
       });
       run.evidence.push({
         id: `${actionId}-evidence`,
@@ -515,6 +518,16 @@ function addCodexItem(run, item, counters, phase) {
     outcome: phase === "incomplete" ? "incomplete" : "unknown",
     note: "Unrecognized codex exec item type. Classify it in policy.actionRisk after review."
   });
+}
+
+// A patch that only writes a ByteFence intent is part of the mediated path:
+// the intent is an input to bytefence_apply, never the protected target.
+function isByteFenceIntentPath(path) {
+  if (typeof path !== "string") return false;
+  const normalized = path.replace(/\\/g, "/");
+  return normalized === ".bytefence/intents" ||
+    normalized.startsWith(".bytefence/intents/") ||
+    normalized.includes("/.bytefence/intents/");
 }
 
 function parseByteFenceToolResult(item) {

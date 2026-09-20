@@ -116,6 +116,28 @@ test("maps declined, failed, deleted and never-completed items conservatively", 
   assert.ok(ids.includes("action.high_risk_without_approval"));
 });
 
+test("writing a ByteFence intent is not an unmediated write", () => {
+  const run = exportCodex(jsonl([
+    { type: "thread.started", thread_id: "thread-intent" },
+    { type: "item.completed", item: { id: "p1", type: "file_change", changes: [{ path: "/abs/workspace/.bytefence/intents/flag.json", kind: "add" }], status: "completed" } },
+    { type: "item.completed", item: { id: "p2", type: "file_change", changes: [{ path: ".bytefence/intents/other.json", kind: "update" }], status: "completed" } },
+    { type: "item.completed", item: { id: "p3", type: "file_change", changes: [{ path: "src/config.js", kind: "update" }], status: "completed" } },
+    { type: "item.completed", item: { id: "p4", type: "file_change", changes: [{ path: ".bytefence/intents/stale.json", kind: "delete" }], status: "completed" } }
+  ]));
+
+  assert.deepEqual(
+    run.actions.map((action) => action.type),
+    ["bytefence_intent", "bytefence_intent", "unmediated_write", "destructive"]
+  );
+
+  const strict = evaluateAgentRun(run, strictPolicy);
+  assert.equal(strict.status, "fail");
+  const flagged = strict.findings.map((finding) => finding.evidence);
+  assert.ok(flagged.includes("unmediated_write -> src/config.js"));
+  assert.ok(flagged.some((evidence) => evidence.startsWith("destructive -> .bytefence/intents/stale.json")));
+  assert.equal(flagged.filter((evidence) => evidence.startsWith("bytefence_intent")).length, 0);
+});
+
 test("unrecognized Codex item types fail closed", () => {
   const run = exportCodex(jsonl([
     { type: "thread.started", thread_id: "thread-future" },

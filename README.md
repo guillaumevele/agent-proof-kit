@@ -43,8 +43,9 @@ mediated and provable.
 | Surface | Status |
 | --- | --- |
 | Claude Code guard + ByteFence MCP | Verified end-to-end with a live Claude Code run ([evidence](docs/evidence/claude-code-guard.md)) |
-| Codex CLI MCP + trace gate | Config accepted by Codex CLI 0.153.4, MCP handshake verified ([guide](docs/integrations/codex.md)) |
-| Codex CLI guard hook | Generated from the Codex hooks reference; live model run pending |
+| Codex CLI MCP + trace gate | Verified end-to-end with a live Codex CLI run ([evidence](docs/evidence/codex-live-run.md)) |
+| Codex CLI guard hook | Verified live: a direct `apply_patch` on a protected file was blocked, the file stayed byte-identical |
+| Codex `PreToolUse` deny enforcement | Measured 8/8 enforced on macOS (0.153.4 and 0.155.1) with `scripts/codex/hook-conformance.sh` |
 
 ## The rest of the kit
 
@@ -201,7 +202,7 @@ Machine-readable artifacts:
 ## GitHub Action
 
 ```yaml
-- uses: guillaumevele/agent-proof-kit@v0.7.0
+- uses: guillaumevele/agent-proof-kit@v0.8.0
   with:
     input: examples/synthetic-agent-run.json
     policy: policies/default-policy.json
@@ -241,7 +242,7 @@ destructive, non-idempotent and never retries an uncertain state. See
 [docs/integrations/mcp.md](docs/integrations/mcp.md).
 
 The `npx` configuration above resolves the latest published package. Replace
-`agent-proof-kit` with `agent-proof-kit@0.7.0` when an immutable MCP dependency
+`agent-proof-kit` with `agent-proof-kit@0.8.0` when an immutable MCP dependency
 version is required.
 
 ## Codex CLI
@@ -253,7 +254,7 @@ resulting `codex exec --json` trace:
 # ~/.codex/config.toml
 [mcp_servers.agent_proof_kit]
 command = "npx"
-args = ["--yes", "--package", "agent-proof-kit@0.7.0", "agent-proof-mcp"]
+args = ["--yes", "--package", "agent-proof-kit@0.8.0", "agent-proof-mcp"]
 required = true
 enabled_tools = ["agent_proof_status", "bytefence_check", "bytefence_apply"]
 

@@ -14,6 +14,9 @@ set -euo pipefail
 
 KIT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 CODEX_BIN="${CODEX_BIN:-codex}"
+# Optional: pin the model, e.g. CODEX_MODEL=gpt-5.6-terra
+MODEL_ARGS=()
+if [ -n "${CODEX_MODEL:-}" ]; then MODEL_ARGS=(--model "$CODEX_MODEL"); fi
 WS="${1:-$(mktemp -d "${TMPDIR:-/tmp}/codex-bytefence-demo.XXXXXX")}"
 WORKSPACE_ID="example/codex-bytefence-demo"
 INTENT_SCHEMA="https://raw.githubusercontent.com/guillaumevele/agent-proof-kit/v0.5.0/schemas/bytefence-intent-v0.1.schema.json"
@@ -38,7 +41,7 @@ git -C "$WS" -c user.name=demo -c user.email=demo@example.com commit -qm "demo b
 
 echo "workspace: $WS"
 
-"$CODEX_BIN" exec --json --skip-git-repo-check --cd "$WS" -s workspace-write \
+"$CODEX_BIN" exec --json --skip-git-repo-check --cd "$WS" -s workspace-write "${MODEL_ARGS[@]}" \
   -c "mcp_servers.agent_proof_kit.command=\"$(command -v node)\"" \
   -c "mcp_servers.agent_proof_kit.args=[\"$KIT/bin/agent-proof-mcp.js\"]" \
   -c "mcp_servers.agent_proof_kit.env={AGENT_PROOF_ROOT=\"$WS\"}" \

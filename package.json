@@ -1,6 +1,6 @@
 {
   "name": "agent-proof-kit",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Stop coding agents from silently rewriting protected files: a PreToolUse guard for Claude Code and Codex, exact raw-byte edits over MCP, and verifiable receipts.",
   "mcpName": "io.github.guillaumevele/agent-proof-kit",
   "type": "module",

@@ -8,6 +8,26 @@ and published releases follow semantic versioning.
 
 No unreleased changes.
 
+## [0.8.0] - 2026-09-20
+
+### Added
+
+- Added `scripts/codex/hook-conformance.sh` and `scripts/codex/deny-hook.mjs`:
+  a reproducible probe that measures whether a Codex CLI build enforces a
+  `PreToolUse` deny, for `apply_patch` and `Bash` and for both documented deny
+  channels, by comparing file digests before and after and counting the host's
+  blocked-call reports.
+- Added `CODEX_MODEL` to `examples/codex/run-demo.sh`.
+- Added `docs/evidence/codex-live-run.md`: live Codex runs of the demo, the
+  guard hook and the conformance probe, with their limits.
+
+### Fixed
+
+- `codex-exec-jsonl` now exports patches that write under `.bytefence/intents/`
+  as `bytefence_intent` (low risk) instead of `unmediated_write`. Writing an
+  intent is an input of the mediated path, and the strict policy failed a
+  correct Codex run because of it.
+
 ## [0.7.0] - 2026-09-16
 
 ### Added
@@ -199,7 +219,8 @@ No unreleased changes.
 
 - Established the initial public Agent Proof Kit repository and CI baseline.
 
-[Unreleased]: https://github.com/guillaumevele/agent-proof-kit/compare/v0.7.0...main
+[Unreleased]: https://github.com/guillaumevele/agent-proof-kit/compare/v0.8.0...main
+[0.8.0]: https://github.com/guillaumevele/agent-proof-kit/releases/tag/v0.8.0
 [0.7.0]: https://github.com/guillaumevele/agent-proof-kit/releases/tag/v0.7.0
 [0.6.0]: https://github.com/guillaumevele/agent-proof-kit/releases/tag/v0.6.0
 [0.5.0]: https://github.com/guillaumevele/agent-proof-kit/releases/tag/v0.5.0
